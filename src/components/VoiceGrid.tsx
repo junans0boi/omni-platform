@@ -36,7 +36,14 @@ export default function VoiceGrid() {
   useEffect(() => {
     if (!livekitToken || !activeVoiceChannelId) return;
 
-    const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "wss://dummy-livekit-url.com";
+    // The WS URL must be a NEXT_PUBLIC_ variable to be accessible client-side
+    // Falls back to a placeholder that will produce a clear connection error
+    const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "";
+    if (!wsUrl) {
+      console.error("NEXT_PUBLIC_LIVEKIT_URL is not set. Add it to .env.local");
+      return;
+    }
+
     const room = new Room({
       adaptiveStream: true,
       dynacast: true,

@@ -16,7 +16,8 @@ export async function GET(req: NextRequest) {
 
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
-  const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
+  // Support both LIVEKIT_URL and NEXT_PUBLIC_LIVEKIT_URL naming conventions
+  const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || process.env.LIVEKIT_URL;
 
   if (!apiKey || !apiSecret || !wsUrl) {
     return NextResponse.json(
