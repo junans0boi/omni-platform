@@ -3,6 +3,9 @@ import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { messageBroker } from "@/lib/events";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -36,43 +39,55 @@ export async function GET(
       return new Response("Forbidden", { status: 403 });
     }
 
-    const responseStream = new TransformStream();
-    const writer = responseStream.writable.getWriter();
     const encoder = new TextEncoder();
 
-    const pingInterval = setInterval(async () => {
-      try {
-        await writer.write(encoder.encode(":\n\n"));
-      } catch {
-        cleanup();
-      }
-    }, 15000);
+    const stream = new ReadableStream({
+      start(controller) {
+        // Send initial connection confirmation
+        controller.enqueue(encoder.encode(": connected\n\n"));
 
-    const handleMessage = async (msg: any) => {
-      try {
-        await writer.write(encoder.encode(`data: ${JSON.stringify(msg)}\n\n`));
-      } catch {
-        cleanup();
-      }
-    };
+        const handleMessage = (msg: any) => {
+          try {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(msg)}\n\n`)
+            );
+          } catch {
+            cleanup();
+          }
+        };
 
-    messageBroker.on(`message:${channelId}`, handleMessage);
+        // Keep-alive ping every 20 seconds
+        const pingInterval = setInterval(() => {
+          try {
+            controller.enqueue(encoder.encode(": ping\n\n"));
+          } catch {
+            cleanup();
+          }
+        }, 20000);
 
-    const cleanup = () => {
-      clearInterval(pingInterval);
-      messageBroker.off(`message:${channelId}`, handleMessage);
-      try {
-        writer.close();
-      } catch {}
-    };
+        messageBroker.on(`message:${channelId}`, handleMessage);
 
-    req.signal.addEventListener("abort", cleanup);
+        function cleanup() {
+          clearInterval(pingInterval);
+          messageBroker.off(`message:${channelId}`, handleMessage);
+          try {
+            controller.close();
+          } catch {}
+        }
 
-    return new Response(responseStream.readable, {
+        req.signal.addEventListener("abort", cleanup);
+      },
+    });
+
+    return new Response(stream, {
       headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-store, no-transform",
         "Connection": "keep-alive",
+        // Disable buffering in Nginx / proxies
+        "X-Accel-Buffering": "no",
+        // Prevent Next.js from gzip-compressing the stream
+        "Content-Encoding": "none",
       },
     });
   } catch (err: any) {
