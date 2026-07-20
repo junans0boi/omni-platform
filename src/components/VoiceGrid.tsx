@@ -112,6 +112,34 @@ export default function VoiceGrid() {
     );
   }, [isScreenSharing]);
 
+  // ── Attach local video track ──────────────────────────────────────────────
+  useEffect(() => {
+    const room = roomRef.current;
+    const container = localVideoRef.current;
+    if (!room || !container) return;
+
+    const syncLocalVideo = () => {
+      container.querySelectorAll("video").forEach((el) => el.remove());
+      const pub = room.localParticipant?.getTrackPublication(Track.Source.Camera);
+      if (pub?.track) {
+        const el = pub.track.attach();
+        el.className = "h-full w-full object-cover rounded-lg scale-x-[-1]";
+        container.appendChild(el);
+      }
+    };
+
+    // Initial sync (in case track is already published)
+    syncLocalVideo();
+
+    room.on(RoomEvent.LocalTrackPublished, syncLocalVideo);
+    room.on(RoomEvent.LocalTrackUnpublished, syncLocalVideo);
+
+    return () => {
+      room.off(RoomEvent.LocalTrackPublished, syncLocalVideo);
+      room.off(RoomEvent.LocalTrackUnpublished, syncLocalVideo);
+    };
+  }, [isCameraOn, livekitToken, activeVoiceChannelId]);
+
   // ── Attach remote video tracks to DOM ────────────────────────────────────
   useEffect(() => {
     remoteParticipants.forEach((p) => {
