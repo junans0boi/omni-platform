@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -27,26 +26,33 @@ export default function SignupPage() {
       return;
     }
 
-    const { error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
           username: formattedUsername,
           display_name: displayName.trim() || formattedUsername,
-        },
-      },
-    });
+        }),
+      });
 
-    if (signUpError) {
-      setError(signUpError.message);
+      const data = await res.json();
+
+      if (res.ok) {
+        setSuccess(true);
+        setLoading(false);
+        setTimeout(() => {
+          router.push("/login");
+        }, 2000);
+      } else {
+        setError(data.error || "Signup failed");
+        setLoading(false);
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
       setLoading(false);
-    } else {
-      setSuccess(true);
-      setLoading(false);
-      setTimeout(() => {
-        router.push("/login");
-      }, 3000);
     }
   };
 

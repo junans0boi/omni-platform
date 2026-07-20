@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { getSessionUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   const room = req.nextUrl.searchParams.get("room");
@@ -25,70 +25,44 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // 1. Initialize Supabase Server client using Next.js 15 async cookies
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Can be ignored if middleware handles session refreshes
-          }
-        },
-      },
-    }
-  );
-
-  // 2. Validate current auth session
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  // 1. Validate current session user from local auth cookie
+  const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 3. Fetch channel information to get space_id and type
-  const { data: channel, error: channelError } = await supabase
-    .from("channels")
-    .select("space_id, type")
-    .eq("id", room)
-    .single();
-
-  if (channelError || !channel) {
-    return NextResponse.json({ error: "Channel not found" }, { status: 404 });
-  }
-
-  // 4. Verify user membership in the space
-  const { data: member, error: memberError } = await supabase
-    .from("members")
-    .select("role")
-    .eq("space_id", channel.space_id)
-    .eq("profile_id", user.id)
-    .single();
-
-  if (memberError || !member) {
-    return NextResponse.json(
-      { error: "Forbidden: You are not a member of this space" },
-      { status: 403 }
-    );
-  }
-
   try {
-    // 5. Determine publishing permissions based on roles & stage channel type
+    // 2. Fetch channel information to get space_id and type
+    const channel = await prisma.channel.findUnique({
+      where: { id: room },
+    });
+
+    if (!channel) {
+      return NextResponse.json({ error: "Channel not found" }, { status: 404 });
+    }
+
+    // 3. Verify user membership in the space
+    const member = await prisma.member.findUnique({
+      where: {
+        spaceId_profileId: {
+          spaceId: channel.spaceId,
+          profileId: user.id,
+        },
+      },
+    });
+
+    if (!member) {
+      return NextResponse.json(
+        { error: "Forbidden: You are not a member of this space" },
+        { status: 403 }
+      );
+    }
+
+    // 4. Determine publishing permissions based on roles & stage channel type
     const isStage = channel.type === "STAGE";
     const canPublish = !isStage || member.role === "ADMIN" || member.role === "OWNER";
 
-    // 6. Generate LiveKit token
+    // 5. Generate LiveKit token
     const at = new AccessToken(apiKey, apiSecret, {
       identity: username,
     });

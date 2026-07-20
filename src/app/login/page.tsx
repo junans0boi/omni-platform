@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -17,16 +16,24 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const { error: loginError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
 
-    if (loginError) {
-      setError(loginError.message);
+      const data = await res.json();
+
+      if (res.ok) {
+        router.push("/dashboard");
+      } else {
+        setError(data.error || "Login failed");
+        setLoading(false);
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
       setLoading(false);
-    } else {
-      router.push("/dashboard");
     }
   };
 
@@ -54,13 +61,13 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">
-              Email Address
+              Username
             </label>
             <input
-              type="email"
+              type="text"
               required
               className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-500 outline-hidden transition focus:border-indigo-500 focus:bg-white/10"
-              placeholder="name@example.com"
+              placeholder="johndoe"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />

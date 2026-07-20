@@ -1,0 +1,80 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Profile {
+  id          String    @id @default(uuid())
+  username    String    @unique
+  displayName String?
+  avatarUrl   String?
+  password    String    // Local dev plain text password for simplicity
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  spaces      Space[]   @relation("SpaceOwner")
+  members     Member[]
+  messages    Message[]
+}
+
+model Space {
+  id          String     @id @default(uuid())
+  name        String
+  avatarUrl   String?
+  inviteCode  String     @unique
+  ownerId     String?
+  owner       Profile?   @relation("SpaceOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now())
+  archivedAt  DateTime?
+  categories  Category[]
+  channels    Channel[]
+  members     Member[]
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  spaceId   String
+  space     Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name      String
+  position  Int       @default(0)
+  createdAt DateTime  @default(now())
+  channels  Channel[]
+}
+
+model Channel {
+  id         String    @id @default(uuid())
+  spaceId    String
+  space      Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name       String
+  type       String    @default("TEXT") // TEXT, VOICE, STAGE
+  position   Int       @default(0)
+  createdAt  DateTime  @default(now())
+  messages   Message[]
+}
+
+model Member {
+  id        String   @id @default(uuid())
+  spaceId   String
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  role      String   @default("MEMBER") // OWNER, ADMIN, MEMBER
+  createdAt DateTime @default(now())
+
+  @@unique([spaceId, profileId])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+}

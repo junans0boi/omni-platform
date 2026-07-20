@@ -1,35 +1,34 @@
 import { create } from "zustand";
-import { supabase } from "@/lib/supabase";
 
 export interface Profile {
   id: string;
   username: string;
-  display_name: string | null;
-  avatar_url: string | null;
-  created_at: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  createdAt: string;
 }
 
 export interface Space {
   id: string;
   name: string;
-  avatar_url: string | null;
-  invite_code: string;
-  owner_id: string | null;
-  created_at: string;
-  archived_at: string | null;
+  avatarUrl: string | null;
+  inviteCode: string;
+  ownerId: string | null;
+  createdAt: string;
+  archivedAt: string | null;
 }
 
 export interface Category {
   id: string;
-  space_id: string;
+  spaceId: string;
   name: string;
   position: number;
 }
 
 export interface Channel {
   id: string;
-  space_id: string;
-  category_id: string | null;
+  spaceId: string;
+  categoryId: string | null;
   name: string;
   type: "TEXT" | "VOICE" | "STAGE";
   position: number;
@@ -37,18 +36,18 @@ export interface Channel {
 
 export interface Member {
   id: string;
-  space_id: string;
-  profile_id: string;
+  spaceId: string;
+  profileId: string;
   role: "OWNER" | "ADMIN" | "MEMBER";
   profile?: Profile;
 }
 
 export interface Message {
   id: string;
-  channel_id: string;
-  profile_id: string;
+  channelId: string;
+  profileId: string;
   content: string;
-  created_at: string;
+  createdAt: string;
   profile?: Profile;
 }
 
@@ -114,85 +113,53 @@ export const useAppStore = create<AppState>((set, get) => ({
   setProfile: (profile) => set({ profile }),
 
   fetchSpaces: async () => {
-    const user = (await supabase.auth.getUser()).data.user;
-    if (!user) return;
-
     set({ isLoading: true });
-    // Fetch spaces where user is a member
-    const { data: memberData, error: memberError } = await supabase
-      .from("members")
-      .select("space_id")
-      .eq("profile_id", user.id);
-
-    if (memberError || !memberData) {
+    try {
+      const res = await fetch("/api/spaces");
+      if (res.ok) {
+        const data = await res.json();
+        set({ spaces: data || [] });
+      }
+    } catch (e) {
+      console.error("Error fetching spaces:", e);
+    } finally {
       set({ isLoading: false });
-      return;
     }
-
-    const spaceIds = memberData.map((m) => m.space_id);
-    if (spaceIds.length === 0) {
-      set({ spaces: [], isLoading: false });
-      return;
-    }
-
-    const { data: spaceData, error: spaceError } = await supabase
-      .from("spaces")
-      .select("*")
-      .in("id", spaceIds)
-      .is("archived_at", null);
-
-    if (spaceError) {
-      set({ isLoading: false });
-      return;
-    }
-
-    set({ spaces: spaceData || [], isLoading: false });
   },
 
   fetchSpaceData: async (spaceId) => {
     set({ isLoading: true });
-
-    // Fetch categories
-    const { data: catData } = await supabase
-      .from("categories")
-      .select("*")
-      .eq("space_id", spaceId)
-      .order("position", { ascending: true });
-
-    // Fetch channels
-    const { data: chanData } = await supabase
-      .from("channels")
-      .select("*")
-      .eq("space_id", spaceId)
-      .order("position", { ascending: true });
-
-    // Fetch members with profiles
-    const { data: memData } = await supabase
-      .from("members")
-      .select("*, profile:profiles(*)")
-      .eq("space_id", spaceId);
-
-    set({
-      categories: catData || [],
-      channels: chanData || [],
-      members: memData || [],
-      isLoading: false,
-    });
+    try {
+      const res = await fetch(`/api/spaces/${spaceId}`);
+      if (res.ok) {
+        const data = await res.json();
+        set({
+          categories: data.categories || [],
+          channels: data.channels || [],
+          members: data.members || [],
+        });
+      }
+    } catch (e) {
+      console.error("Error fetching space details:", e);
+    } finally {
+      set({ isLoading: false });
+    }
   },
 
   fetchMessages: async (channelId) => {
-    const { data: msgData } = await supabase
-      .from("messages")
-      .select("*, profile:profiles(*)")
-      .eq("channel_id", channelId)
-      .order("created_at", { ascending: true });
-
-    set({ messages: msgData || [] });
+    try {
+      const res = await fetch(`/api/channels/${channelId}/messages`);
+      if (res.ok) {
+        const data = await res.json();
+        set({ messages: data || [] });
+      }
+    } catch (e) {
+      console.error("Error fetching messages:", e);
+    }
   },
 
   addMessage: (message) => {
     set((state) => {
-      // Avoid duplicate renders if message is already added
       if (state.messages.some((m) => m.id === message.id)) {
         return state;
       }
@@ -201,95 +168,65 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   createSpace: async (name, avatarUrl) => {
-    const user = (await supabase.auth.getUser()).data.user;
-    if (!user) return null;
-
-    // Generate random 6-character invite code
-    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-
-    const { data: spaceData, error } = await supabase
-      .from("spaces")
-      .insert({
-        name,
-        avatar_url: avatarUrl || null,
-        invite_code: inviteCode,
-        owner_id: user.id,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error creating space:", error);
-      return null;
+    try {
+      const res = await fetch("/api/spaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, avatar_url: avatarUrl }),
+      });
+      if (res.ok) {
+        const space = await res.json();
+        await get().fetchSpaces();
+        return space;
+      }
+    } catch (e) {
+      console.error("Error creating space:", e);
     }
-
-    // Refresh spaces list
-    await get().fetchSpaces();
-    return spaceData;
+    return null;
   },
 
   joinSpace: async (inviteCode) => {
-    const user = (await supabase.auth.getUser()).data.user;
-    if (!user) return false;
-
-    // Find space by invite code
-    const { data: spaceData, error: spaceError } = await supabase
-      .from("spaces")
-      .select("id")
-      .eq("invite_code", inviteCode.trim().toUpperCase())
-      .is("archived_at", null)
-      .single();
-
-    if (spaceError || !spaceData) {
-      return false;
+    try {
+      const res = await fetch("/api/spaces", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invite_code: inviteCode }),
+      });
+      if (res.ok) {
+        await get().fetchSpaces();
+        return true;
+      }
+    } catch (e) {
+      console.error("Error joining space:", e);
     }
-
-    // Add to members table
-    const { error: joinError } = await supabase.from("members").insert({
-      space_id: spaceData.id,
-      profile_id: user.id,
-      role: "MEMBER",
-    });
-
-    if (joinError && joinError.code !== "23505") { // Ignore duplicate key (already joined)
-      console.error("Error joining space:", joinError);
-      return false;
-    }
-
-    await get().fetchSpaces();
-    return true;
+    return false;
   },
 
   deleteSpace: async (spaceId) => {
-    const { error } = await supabase
-      .from("spaces")
-      .update({ archived_at: new Date().toISOString() })
-      .eq("id", spaceId);
-
-    if (error) {
-      console.error("Error deleting space:", error);
-      return;
-    }
-
-    // Refresh and reset active space/channel if deleted space was active
-    await get().fetchSpaces();
-    if (get().activeSpaceId === spaceId) {
-      set({ activeSpaceId: null, activeChannelId: null });
+    try {
+      const res = await fetch(`/api/spaces/${spaceId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        await get().fetchSpaces();
+        if (get().activeSpaceId === spaceId) {
+          set({ activeSpaceId: null, activeChannelId: null });
+        }
+      }
+    } catch (e) {
+      console.error("Error deleting space:", e);
     }
   },
 
   sendMessage: async (channelId, content) => {
-    const user = (await supabase.auth.getUser()).data.user;
-    if (!user) return;
-
-    const { error } = await supabase.from("messages").insert({
-      channel_id: channelId,
-      profile_id: user.id,
-      content,
-    });
-
-    if (error) {
-      console.error("Error sending message:", error);
+    try {
+      await fetch(`/api/channels/${channelId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+    } catch (e) {
+      console.error("Error sending message:", e);
     }
   },
 
@@ -305,7 +242,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ isLoading: true });
       const res = await fetch(
         `/api/livekit/token?room=${channelId}&username=${encodeURIComponent(
-          profile.display_name || profile.username
+          profile.displayName || profile.username
         )}`
       );
       const data = await res.json();

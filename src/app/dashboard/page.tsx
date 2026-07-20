@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import { useAppStore, Space, Channel, Category } from "@/store/useAppStore";
 import { useRealtime } from "@/hooks/useRealtime";
 import {
@@ -65,27 +64,22 @@ export default function DashboardPage() {
   // Authenticate user & load initial spaces
   useEffect(() => {
     const checkAuth = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const res = await fetch("/api/auth/me");
+        if (!res.ok) {
+          router.push("/login");
+          return;
+        }
 
-      if (!user) {
+        const data = await res.json();
+        if (data.user) {
+          setProfile(data.user);
+        }
+
+        await fetchSpaces();
+      } catch (err) {
         router.push("/login");
-        return;
       }
-
-      // Fetch Profile
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      if (profileData) {
-        setProfile(profileData);
-      }
-
-      await fetchSpaces();
     };
 
     checkAuth();
@@ -110,9 +104,8 @@ export default function DashboardPage() {
     if (channels.length > 0) {
       const textChans = channels.filter((c) => c.type === "TEXT");
       if (textChans.length > 0) {
-        // If current active channel does not belong to active space, select default
         const activeChanObj = channels.find((c) => c.id === activeChannelId);
-        if (!activeChanObj || activeChanObj.space_id !== activeSpaceId) {
+        if (!activeChanObj || activeChanObj.spaceId !== activeSpaceId) {
           setActiveChannelId(textChans[0].id);
         }
       }
@@ -168,7 +161,7 @@ export default function DashboardPage() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   };
 
@@ -183,7 +176,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#09090b] text-[#e4e4e7]">
-      {/* 1. Space Selection Sidebar (Leftmost) */}
+      {/* 1. Space Selection Sidebar */}
       <div className="flex w-[72px] flex-col items-center gap-3 border-r border-white/5 bg-[#0c0c0e] py-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-tr from-indigo-500 to-purple-600 text-xl font-bold shadow-lg shadow-indigo-500/20 cursor-default select-none">
           Ω
@@ -191,7 +184,6 @@ export default function DashboardPage() {
 
         <div className="h-[2px] w-8 rounded bg-white/10" />
 
-        {/* Space list */}
         <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto w-full items-center no-scrollbar">
           {spaces.map((space) => {
             const isActive = space.id === activeSpaceId;
@@ -206,7 +198,6 @@ export default function DashboardPage() {
                 }}
                 title={space.name}
               >
-                {/* Active indicator bar */}
                 <div
                   className="absolute left-0 w-1 rounded-r bg-white transition-all duration-300"
                   style={{
@@ -214,10 +205,10 @@ export default function DashboardPage() {
                     transform: isActive ? "scaleY(1)" : "scaleY(0)",
                   }}
                 />
-                {space.avatar_url ? (
+                {space.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={space.avatar_url}
+                    src={space.avatarUrl}
                     alt={space.name}
                     className="h-full w-full object-cover rounded-3xl group-hover:rounded-2xl transition-all duration-300"
                     style={{ borderRadius: isActive ? "16px" : undefined }}
@@ -231,7 +222,6 @@ export default function DashboardPage() {
             );
           })}
 
-          {/* Add Space Button */}
           <button
             onClick={() => setShowCreateModal(true)}
             className="flex h-12 w-12 items-center justify-center rounded-3xl border border-dashed border-zinc-700 bg-transparent text-zinc-400 transition-all duration-300 hover:rounded-2xl hover:border-emerald-500 hover:bg-emerald-600/10 hover:text-emerald-400"
@@ -240,7 +230,6 @@ export default function DashboardPage() {
             <Plus className="h-5 w-5" />
           </button>
 
-          {/* Join Space Button */}
           <button
             onClick={() => setShowJoinModal(true)}
             className="flex h-12 w-12 items-center justify-center rounded-3xl border border-dashed border-zinc-700 bg-transparent text-zinc-400 transition-all duration-300 hover:rounded-2xl hover:border-indigo-500 hover:bg-indigo-600/10 hover:text-indigo-400"
@@ -250,7 +239,6 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* User profile actions */}
         <div className="flex flex-col gap-3">
           <button
             onClick={handleLogout}
@@ -262,16 +250,15 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 2. Space Channels & Options (Middle-Left) */}
+      {/* 2. Space Channels Sidebar */}
       <div className="flex w-60 flex-col border-r border-white/5 bg-[#111113]">
         {activeSpace ? (
           <>
-            {/* Space Header */}
             <div className="flex h-14 items-center justify-between border-b border-white/5 px-4">
               <h2 className="truncate text-base font-bold text-white" title={activeSpace.name}>
                 {activeSpace.name}
               </h2>
-              {profile?.id === activeSpace.owner_id && (
+              {profile?.id === activeSpace.ownerId && (
                 <button
                   onClick={() => {
                     if (confirm("Are you sure you want to delete this space?")) {
@@ -286,17 +273,16 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Invite Info Box */}
             <div className="mx-3 mt-3 rounded-lg bg-white/5 p-3 border border-white/5">
               <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                 Invite Code
               </span>
               <div className="mt-1.5 flex items-center justify-between rounded bg-zinc-950 px-2 py-1 text-xs">
                 <code className="font-mono text-zinc-300 select-all">
-                  {activeSpace.invite_code}
+                  {activeSpace.inviteCode}
                 </code>
                 <button
-                  onClick={() => copyInviteCode(activeSpace.invite_code)}
+                  onClick={() => copyInviteCode(activeSpace.inviteCode)}
                   className="text-zinc-500 hover:text-white"
                 >
                   <Copy className="h-3.5 w-3.5" />
@@ -309,7 +295,6 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Category / Channel list */}
             <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4 no-scrollbar">
               {categories.map((category) => (
                 <div key={category.id} className="space-y-0.5">
@@ -317,7 +302,7 @@ export default function DashboardPage() {
                     {category.name}
                   </span>
                   {channels
-                    .filter((c) => c.category_id === category.id)
+                    .filter((c) => c.categoryId === category.id)
                     .map((channel) => {
                       const isActive = channel.id === activeChannelId;
                       return (
@@ -348,28 +333,26 @@ export default function DashboardPage() {
               ))}
             </div>
 
-            {/* Self Profile summary */}
             {profile && (
               <div className="flex h-[52px] items-center gap-2 border-t border-white/5 bg-zinc-950/40 px-3">
                 <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-zinc-700">
-                  {profile.avatar_url ? (
+                  {profile.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={profile.avatar_url}
+                      src={profile.avatarUrl}
                       alt={profile.username}
                       className="h-full w-full object-cover rounded-full"
                     />
                   ) : (
                     <span className="text-xs uppercase font-semibold text-zinc-300">
-                      {profile.display_name?.substring(0, 2) || profile.username.substring(0, 2)}
+                      {profile.displayName?.substring(0, 2) || profile.username.substring(0, 2)}
                     </span>
                   )}
-                  {/* Status dot */}
                   <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 border border-zinc-950" />
                 </div>
                 <div className="flex flex-1 flex-col overflow-hidden leading-tight">
                   <span className="truncate text-xs font-bold text-white">
-                    {profile.display_name || profile.username}
+                    {profile.displayName || profile.username}
                   </span>
                   <span className="truncate text-[10px] text-zinc-500">@{profile.username}</span>
                 </div>
@@ -384,11 +367,10 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* 3. Messaging Area (Center) */}
+      {/* 3. Messaging Area */}
       <div className="flex flex-1 flex-col bg-[#151518]">
         {activeChannel ? (
           <>
-            {/* Chat Room Header */}
             <div className="flex h-14 items-center justify-between border-b border-white/5 px-6">
               <div className="flex items-center gap-2">
                 <Hash className="h-5 w-5 text-zinc-400" />
@@ -396,24 +378,22 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Voice Grid Panel */}
             <VoiceGrid />
 
-            {/* Message Feed */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
               {messages.map((message) => (
                 <div key={message.id} className="flex items-start gap-4">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-700">
-                    {message.profile?.avatar_url ? (
+                    {message.profile?.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={message.profile.avatar_url}
+                        src={message.profile.avatarUrl}
                         alt={message.profile.username}
                         className="h-full w-full object-cover rounded-full"
                       />
                     ) : (
                       <span className="text-xs uppercase font-semibold text-zinc-300">
-                        {message.profile?.display_name?.substring(0, 2) ||
+                        {message.profile?.displayName?.substring(0, 2) ||
                           message.profile?.username.substring(0, 2) ||
                           "U"}
                       </span>
@@ -422,10 +402,10 @@ export default function DashboardPage() {
                   <div className="flex-1 overflow-hidden leading-tight">
                     <div className="flex items-baseline gap-2">
                       <span className="text-sm font-bold text-white">
-                        {message.profile?.display_name || message.profile?.username || "Unknown"}
+                        {message.profile?.displayName || message.profile?.username || "Unknown"}
                       </span>
                       <span className="text-[10px] text-zinc-500">
-                        {new Date(message.created_at).toLocaleTimeString([], {
+                        {new Date(message.createdAt).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
@@ -440,7 +420,6 @@ export default function DashboardPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Bar */}
             <form onSubmit={handleSendMessage} className="p-4 bg-zinc-950/20">
               <div className="flex items-center gap-2 rounded-xl bg-white/5 border border-white/10 px-4 py-2.5 focus-within:border-indigo-500 transition">
                 <input
@@ -467,7 +446,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* 4. Presence list (Rightmost) */}
+      {/* 4. Presence list */}
       {activeSpace && (
         <div className="flex w-60 flex-col border-l border-white/5 bg-[#111113]">
           <div className="flex h-14 items-center gap-2 border-b border-white/5 px-4">
@@ -479,24 +458,23 @@ export default function DashboardPage() {
 
           <div className="flex-1 overflow-y-auto px-2 py-3 space-y-2 no-scrollbar">
             {members.map((member) => {
-              const isOnline = !!presenceUsers[member.profile_id];
+              const isOnline = !!presenceUsers[member.profileId];
               return (
                 <div key={member.id} className="flex items-center gap-3 rounded-lg px-2 py-1.5">
                   <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-zinc-700">
-                    {member.profile?.avatar_url ? (
+                    {member.profile?.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={member.profile.avatar_url}
+                        src={member.profile.avatarUrl}
                         alt={member.profile.username}
                         className="h-full w-full object-cover rounded-full"
                       />
                     ) : (
                       <span className="text-xs uppercase font-semibold text-zinc-300">
-                        {member.profile?.display_name?.substring(0, 2) ||
+                        {member.profile?.displayName?.substring(0, 2) ||
                           member.profile?.username.substring(0, 2)}
                       </span>
                     )}
-                    {/* Online status indicator */}
                     <span
                       className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border border-zinc-950"
                       style={{
@@ -506,7 +484,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex flex-1 flex-col overflow-hidden leading-tight">
                     <span className="truncate text-xs font-bold text-white">
-                      {member.profile?.display_name || member.profile?.username}
+                      {member.profile?.displayName || member.profile?.username}
                     </span>
                     <span className="truncate text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
                       {member.role}
@@ -520,7 +498,6 @@ export default function DashboardPage() {
       )}
 
       {/* 5. Modals */}
-      {/* Create Space Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs px-4">
           <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#151518] p-6 shadow-2xl">
@@ -572,7 +549,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Join Space Modal */}
       {showJoinModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs px-4">
           <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#151518] p-6 shadow-2xl">
