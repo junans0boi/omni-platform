@@ -436,8 +436,19 @@ export default function DashboardPage() {
             <div className={`flex h-14 shrink-0 items-center justify-between border-b px-4 ${theme === 'dark' ? 'border-white/5' : 'border-zinc-200 bg-white'}`}>
               <h2 className="truncate text-sm font-bold">{activeSpace.name}</h2>
               <div className="flex gap-1">
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(activeSpace.inviteCode);
+                    setCopiedInvite(true);
+                    setTimeout(() => setCopiedInvite(false), 2000);
+                  }}
+                  title="Copy Invite Code"
+                  className={`rounded p-1.5 transition-colors ${copiedInvite ? 'text-emerald-500' : (theme === 'dark' ? 'text-zinc-400 hover:bg-white/10 hover:text-white' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900')}`}
+                >
+                  {copiedInvite ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                </button>
                 {isAdminOrOwner && (
-                  <button onClick={() => openModal("createChannel")} className={`rounded p-1.5 transition-colors ${theme === 'dark' ? 'text-zinc-400 hover:bg-white/10 hover:text-white' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'}`}><Plus className="h-4 w-4" /></button>
+                  <button onClick={() => openModal("createChannel")} title="Create Channel" className={`rounded p-1.5 transition-colors ${theme === 'dark' ? 'text-zinc-400 hover:bg-white/10 hover:text-white' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'}`}><Plus className="h-4 w-4" /></button>
                 )}
               </div>
             </div>
