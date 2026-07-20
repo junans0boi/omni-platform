@@ -18,6 +18,7 @@ model Profile {
   spaces      Space[]   @relation("SpaceOwner")
   members     Member[]
   messages    Message[]
+  reactions   Reaction[]
 }
 
 model Space {
@@ -70,11 +71,25 @@ model Member {
 }
 
 model Message {
-  id        String   @id @default(uuid())
+  id        String     @id @default(uuid())
   channelId String
-  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  channel   Channel    @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  profileId String
+  profile   Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime   @default(now())
+  editedAt  DateTime?
+  reactions Reaction[]
+}
+
+model Reaction {
+  id        String   @id @default(uuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
   profileId String
   profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  content   String
+  emoji     String
   createdAt DateTime @default(now())
+
+  @@unique([messageId, profileId, emoji])
 }

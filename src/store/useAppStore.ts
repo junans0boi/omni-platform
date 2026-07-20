@@ -42,13 +42,25 @@ export interface Member {
   profile?: Profile;
 }
 
+export interface Reaction {
+  id: string;
+  messageId: string;
+  profileId: string;
+  emoji: string;
+  createdAt: string;
+  profile?: Profile;
+}
+
 export interface Message {
   id: string;
   channelId: string;
   profileId: string;
   content: string;
   createdAt: string;
+  editedAt?: string | null;
   profile?: Profile;
+  reactions?: Reaction[];
+  _type?: "UPDATE" | "DELETE";
 }
 
 interface AppState {
@@ -63,6 +75,10 @@ interface AppState {
   presenceUsers: Record<string, any>;
   isLoading: boolean;
 
+  // New states
+  theme: "light" | "dark";
+  unreadBadges: Record<string, number>;
+
   // Voice/Video States
   activeVoiceChannelId: string | null;
   livekitToken: string | null;
@@ -70,6 +86,7 @@ interface AppState {
   isCameraOn: boolean;
   isScreenSharing: boolean;
 
+  setTheme: (theme: "light" | "dark") => void;
   setProfile: (profile: Profile | null) => void;
   fetchSpaces: () => Promise<void>;
   fetchSpaceData: (spaceId: string) => Promise<void>;
@@ -79,9 +96,13 @@ interface AppState {
   joinSpace: (inviteCode: string) => Promise<boolean>;
   deleteSpace: (spaceId: string) => Promise<void>;
   sendMessage: (channelId: string, content: string) => Promise<void>;
+  editMessage: (channelId: string, msgId: string, content: string) => Promise<void>;
+  deleteMessage: (channelId: string, msgId: string) => Promise<void>;
+  toggleReaction: (channelId: string, msgId: string, emoji: string) => Promise<void>;
   setActiveSpaceId: (spaceId: string | null) => void;
   setActiveChannelId: (channelId: string | null) => void;
   setPresenceUsers: (users: Record<string, any>) => void;
+  clearUnreadBadge: (channelId: string) => void;
 
   // Voice/Video Actions
   joinVoiceChannel: (channelId: string) => Promise<void>;
@@ -102,6 +123,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeChannelId: null,
   presenceUsers: {},
   isLoading: false,
+  theme: "dark",
+  unreadBadges: {},
 
   // Voice/Video initial states
   activeVoiceChannelId: null,
@@ -110,6 +133,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isCameraOn: false,
   isScreenSharing: false,
 
+  setTheme: (theme) => set({ theme }),
   setProfile: (profile) => set({ profile }),
 
   fetchSpaces: async () => {
@@ -160,10 +184,42 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addMessage: (message) => {
     set((state) => {
+      // Handle delete event
+      if (message._type === "DELETE") {
+        return { messages: state.messages.filter((m) => m.id !== message.id) };
+      }
+      
+      // Handle update event
+      if (message._type === "UPDATE") {
+        return {
+          messages: state.messages.map((m) => (m.id === message.id ? { ...m, ...message } : m)),
+        };
+      }
+
+      // Handle new message
       if (state.messages.some((m) => m.id === message.id)) {
         return state;
       }
-      return { messages: [...state.messages, message] };
+
+      const newState: Partial<AppState> = { messages: [...state.messages, message] };
+
+      // Increment unread badge if message is not in active channel
+      if (message.channelId !== state.activeChannelId) {
+        newState.unreadBadges = {
+          ...state.unreadBadges,
+          [message.channelId]: (state.unreadBadges[message.channelId] || 0) + 1,
+        };
+      }
+
+      return newState;
+    });
+  },
+
+  clearUnreadBadge: (channelId) => {
+    set((state) => {
+      const unreadBadges = { ...state.unreadBadges };
+      delete unreadBadges[channelId];
+      return { unreadBadges };
     });
   },
 
@@ -230,8 +286,45 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  editMessage: async (channelId, msgId, content) => {
+    try {
+      await fetch(`/api/channels/${channelId}/messages/${msgId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+    } catch (e) {
+      console.error("Error editing message:", e);
+    }
+  },
+
+  deleteMessage: async (channelId, msgId) => {
+    try {
+      await fetch(`/api/channels/${channelId}/messages/${msgId}`, {
+        method: "DELETE",
+      });
+    } catch (e) {
+      console.error("Error deleting message:", e);
+    }
+  },
+
+  toggleReaction: async (channelId, msgId, emoji) => {
+    try {
+      await fetch(`/api/channels/${channelId}/messages/${msgId}/reactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      });
+    } catch (e) {
+      console.error("Error toggling reaction:", e);
+    }
+  },
+
   setActiveSpaceId: (spaceId) => set({ activeSpaceId: spaceId }),
-  setActiveChannelId: (channelId) => set({ activeChannelId: channelId }),
+  setActiveChannelId: (channelId) => {
+    set({ activeChannelId: channelId });
+    if (channelId) get().clearUnreadBadge(channelId);
+  },
   setPresenceUsers: (presenceUsers) => set({ presenceUsers }),
 
   joinVoiceChannel: async (channelId) => {
@@ -278,3 +371,4 @@ export const useAppStore = create<AppState>((set, get) => ({
   toggleCamera: () => set((state) => ({ isCameraOn: !state.isCameraOn })),
   toggleScreenShare: () => set((state) => ({ isScreenSharing: !state.isScreenSharing })),
 }));
+
