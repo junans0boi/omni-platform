@@ -37,6 +37,7 @@ export interface Channel {
   categoryId: string | null;
   name: string;
   type: "TEXT" | "VOICE" | "STAGE";
+  mode?: "GENERAL" | "MEETING" | "LECTURE" | string;
   position: number;
 }
 

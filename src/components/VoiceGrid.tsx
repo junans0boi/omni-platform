@@ -32,6 +32,7 @@ export default function VoiceGrid() {
     toggleCamera,
     toggleScreenShare,
     profile,
+    channels,
   } = useAppStore(useShallow((state) => ({
     livekitToken: state.livekitToken,
     activeVoiceChannelId: state.activeVoiceChannelId,
@@ -43,9 +44,18 @@ export default function VoiceGrid() {
     toggleCamera: state.toggleCamera,
     toggleScreenShare: state.toggleScreenShare,
     profile: state.profile,
+    channels: state.channels,
   })));
 
+  const activeChannel = channels.find((c) => c.id === activeVoiceChannelId);
+  const isHost = activeChannel ? true : false;
+
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [floorRequests, setFloorRequests] = useState<{ id: string; name: string }[]>([]);
+  const [grantedSpeakers, setGrantedSpeakers] = useState<string[]>([]);
+  const [showFloorPanel, setShowFloorPanel] = useState(false);
+  const [handRaised, setHandRaised] = useState(false);
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
   const [activeSpeakerSids, setActiveSpeakerSids] = useState<string[]>([]);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -536,6 +546,117 @@ export default function VoiceGrid() {
             >
               <Monitor className="h-4 w-4" />
             </ControlButton>
+
+            {/* Mode & Host Badge */}
+            {activeChannel && (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold text-indigo-300">
+                <span>{activeChannel.mode === "LECTURE" ? "🎓 강의 모드" : activeChannel.mode === "MEETING" ? "🤝 회의 모드" : "💬 자유 모드"}</span>
+                {isHost && <span className="text-amber-400">👑</span>}
+              </div>
+            )}
+
+            {/* Mode & Floor Controls */}
+            <div className="h-5 w-px bg-white/10" />
+
+            {/* Raise Hand Button */}
+            <button
+              onClick={() => {
+                const nextState = !handRaised;
+                setHandRaised(nextState);
+                if (nextState && profile) {
+                  setFloorRequests((prev) => [...prev, { id: profile.id, name: profile.displayName || profile.username }]);
+                } else if (profile) {
+                  setFloorRequests((prev) => prev.filter((r) => r.id !== profile.id));
+                }
+              }}
+              title="발언권/질문 신청 (Raise Hand)"
+              className={`flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition active:scale-95 ${
+                handRaised
+                  ? "border-amber-500/50 bg-amber-500/20 text-amber-300 shadow-md shadow-amber-500/20 animate-pulse"
+                  : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
+              }`}
+            >
+              <span>🖐️</span>
+              <span>{handRaised ? "신청됨" : "발언 신청"}</span>
+            </button>
+
+            {/* Host Floor Management Panel Button */}
+            <div className="relative">
+              <button
+                onClick={() => setShowFloorPanel(!showFloorPanel)}
+                title="손든 학생/신청자 관리"
+                className="flex h-9 items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-500/10 px-3 text-xs font-semibold text-purple-300 hover:bg-purple-500/20 transition"
+              >
+                <span>👑</span>
+                <span>신청자 목록</span>
+                {floorRequests.length > 0 && (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-slate-950">
+                    {floorRequests.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Host Floor Requests Dropdown */}
+              {showFloorPanel && (
+                <div className="absolute bottom-12 right-0 w-72 rounded-2xl border border-white/15 bg-slate-950/95 p-4 shadow-2xl backdrop-blur-2xl z-50 text-left">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>👑</span> 발언/질문 신청자 목록
+                    </span>
+                    <button onClick={() => setShowFloorPanel(false)} className="text-zinc-500 hover:text-white text-xs">✕</button>
+                  </div>
+
+                  {floorRequests.length === 0 ? (
+                    <p className="py-4 text-center text-xs text-zinc-500">현재 발언 신청자가 없습니다.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {floorRequests.map((req) => {
+                        const isGranted = grantedSpeakers.includes(req.id);
+                        return (
+                          <div key={req.id} className="flex items-center justify-between rounded-xl bg-white/5 p-2.5 text-xs">
+                            <span className="font-semibold text-white truncate max-w-[110px]">{req.name}</span>
+                            <div className="flex gap-1">
+                              {!isGranted ? (
+                                <button
+                                  onClick={() => setGrantedSpeakers((prev) => [...prev, req.id])}
+                                  className="rounded-lg bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white hover:bg-emerald-500"
+                                >
+                                  발언 허용
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => setGrantedSpeakers((prev) => prev.filter((i) => i !== req.id))}
+                                  className="rounded-lg bg-rose-600/30 text-rose-300 border border-rose-500/30 px-2 py-1 text-[10px] font-bold hover:bg-rose-600 hover:text-white"
+                                >
+                                  회수
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Fullscreen Toggle Button */}
+            <button
+              onClick={() => {
+                if (!document.fullscreenElement) {
+                  document.documentElement.requestFullscreen();
+                  setIsFullscreen(true);
+                } else {
+                  document.exitFullscreen();
+                  setIsFullscreen(false);
+                }
+              }}
+              title="전체화면 (Fullscreen)"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 transition"
+            >
+              <span>{isFullscreen ? "↙️" : "↗️"}</span>
+            </button>
 
             <div className="h-5 w-px bg-white/10" />
 

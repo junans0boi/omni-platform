@@ -79,6 +79,7 @@ model Channel {
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   name       String
   type       String    @default("TEXT") // TEXT, VOICE, STAGE
+  mode       String    @default("GENERAL") // GENERAL, MEETING, LECTURE
   position   Int       @default(0)
   createdAt  DateTime  @default(now())
   messages   Message[]

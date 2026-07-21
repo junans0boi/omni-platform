@@ -9,11 +9,14 @@ import { getErrorMessage } from "@/lib/errors";
 import {
   Hash, Volume2, Plus, Compass, LogOut, Trash2, Copy, X, Send,
   Users, ChevronDown, ChevronRight, Edit2, Crown, Shield, UserMinus,
-  ImageIcon, Smile, PanelLeftClose, PanelLeft, Check, MessageSquare, Reply
+  ImageIcon, Smile, PanelLeftClose, PanelLeft, Check, MessageSquare, Reply, Settings
 } from "lucide-react";
 import VoiceGrid from "@/components/VoiceGrid";
 import { LocaleSettings } from "@/components/LocaleSettings";
 import { SoundSettings } from "@/components/SoundSettings";
+import { SettingsModal } from "@/components/SettingsModal";
+import { FriendsPanel } from "@/components/FriendsPanel";
+import { ChannelHeaderExtras } from "@/components/ChannelHeaderExtras";
 import { getSoundEffects } from "@/lib/browser-sound-effects";
 import { DEFAULT_SOUND_PREFERENCE, type SoundPreference } from "@/lib/sound-effects";
 import { readSoundPreference, writeSoundPreference } from "@/lib/sound-preference-storage";
@@ -97,6 +100,8 @@ export default function DashboardPage() {
   const [threadRootId, setThreadRootId] = useState<string | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [mainView, setMainView] = useState<"space" | "friends">("space");
 
   const previousFirstMessageRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -636,7 +641,10 @@ export default function DashboardPage() {
           <select
             aria-label={t("dashboard.selectSpace")}
             value={activeSpaceId ?? ""}
-            onChange={(event) => setActiveSpaceId(event.target.value || null)}
+            onChange={(event) => {
+              setActiveSpaceId(event.target.value || null);
+              setMainView("space");
+            }}
             className="min-w-0 flex-1 truncate rounded-lg border border-white/10 bg-zinc-900 px-2 py-1.5 text-sm font-semibold text-white outline-hidden focus:border-blue-500"
           >
             <option value="" disabled>{spaces.length ? t("dashboard.selectASpace") : t("dashboard.noSpaces")}</option>
@@ -645,6 +653,32 @@ export default function DashboardPage() {
           <button onClick={() => openModal("createSpace")} title={t("dialog.createSpace")} aria-label={t("dialog.createSpace")}
             className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white">
             <Plus className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Global Navigation Switcher: Space Chat vs Friends & DMs */}
+        <div className="grid grid-cols-2 p-2 gap-1.5 border-b border-white/5 bg-white/5">
+          <button
+            onClick={() => setMainView("space")}
+            className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition ${
+              mainView === "space"
+                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm"
+                : "text-zinc-400 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <span>💬</span>
+            <span>스페이스</span>
+          </button>
+          <button
+            onClick={() => setMainView("friends")}
+            className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition ${
+              mainView === "friends"
+                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm"
+                : "text-zinc-400 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <span>👥</span>
+            <span>친구 / DM</span>
           </button>
         </div>
         {activeSpace ? (
@@ -746,7 +780,10 @@ export default function DashboardPage() {
                   <span className="truncate text-sm font-semibold">{profile.displayName || profile.username}</span>
                   <span className={`truncate text-xs ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-500'}`}>@{profile.username}</span>
                 </div>
-                <button onClick={handleLogout} className="rounded-lg p-2 text-zinc-500 hover:bg-red-500/10 hover:text-red-400" title={t("profile.logout")}>
+                <button onClick={() => setIsSettingsOpen(true)} className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition" title={t("settings.title")}>
+                  <Settings className="h-4 w-4" />
+                </button>
+                <button onClick={handleLogout} className="rounded-lg p-2 text-zinc-500 hover:bg-red-500/10 hover:text-red-400 transition" title={t("profile.logout")}>
                   <LogOut className="h-4 w-4" />
                 </button>
               </div>
@@ -760,9 +797,11 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* 2. Main Chat Area */}
+      {/* 2. Main Chat Area or Friends Panel */}
       <div className="flex min-w-0 flex-1 flex-col bg-[#151518]">
-        {activeChannel ? (
+        {mainView === "friends" ? (
+          <FriendsPanel currentProfile={profile} />
+        ) : activeChannel ? (
           <>
             {/* Top Bar */}
             <div className={`flex h-14 shrink-0 items-center justify-between border-b px-4 ${theme === 'dark' ? 'border-white/5' : 'border-zinc-200'}`}>
@@ -777,17 +816,20 @@ export default function DashboardPage() {
                 </div>
               </div>
               
-              <button
-                ref={memberDialogButtonRef}
-                onClick={() => setIsMemberDialogOpen(true)}
-                aria-label="View members"
-                aria-haspopup="dialog"
-                aria-expanded={isMemberDialogOpen}
-                className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"
-              >
-                <Users className="h-5 w-5" />
-                <span className="text-xs font-semibold">{members.length}</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <ChannelHeaderExtras messages={messages} />
+                <button
+                  ref={memberDialogButtonRef}
+                  onClick={() => setIsMemberDialogOpen(true)}
+                  aria-label="View members"
+                  aria-haspopup="dialog"
+                  aria-expanded={isMemberDialogOpen}
+                  className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <Users className="h-5 w-5" />
+                  <span className="text-xs font-semibold">{members.length}</span>
+                </button>
+              </div>
             </div>
 
             <VoiceGrid />
@@ -1281,6 +1323,15 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Independent Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        profile={profile}
+        onProfileUpdate={(updated) => setProfile(updated)}
+        onLogout={handleLogout}
+      />
     </div>
   );
 }

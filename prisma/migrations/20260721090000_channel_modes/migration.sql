@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Channel" ADD COLUMN "mode" TEXT NOT NULL DEFAULT 'GENERAL';
