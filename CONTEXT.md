@@ -57,7 +57,10 @@ Idea ──> Research ──> Prototype ──> PRD ──> Kanban ──> Execu
 
 ## 4. 도메인 용어집 (Domain Glossary)
 
+* **User Identity (사용자 인증 주체)**: 로그인 자격과 세션을 소유하는 사용자 본인 확인 주체. 다른 사용자가 보는 이름·아바타인 Profile과 구분한다.
+* **Profile (프로필)**: 플랫폼 안에서 표시되고 Space 활동에 연결되는 사용자 표현. 인증 자격 자체를 뜻하지 않는다.
 * **Space (스페이스)**: 디스코드의 '서버(Guild)'에 해당하는 최상위 커뮤니티 공간.
+* **Membership (멤버십)**: 하나의 Profile이 하나의 Space에 참여하는 관계. Space 데이터 접근 권한의 기본 경계다.
 * **Category (카테고리)**: 채널들을 묶는 그룹 (예: 🎮 게임, 🏢 업무, 🎓 강의).
 * **TextChannel (텍스트 채널)**: Supabase Realtime 기반 실시간 메시징 채널.
 * **VoiceChannel (음성 채널)**: WebRTC/LiveKit 기반의 소규모 통화 및 화면 공유 채널.
@@ -84,6 +87,5 @@ Idea ──> Research ──> Prototype ──> PRD ──> Kanban ──> Execu
 * **삭제 정책 (Soft Delete)**: 스페이스 삭제 시 데이터베이스에서 즉시 레코드를 삭제하지 않고 `archived_at` 플래그를 통한 소프트 딜리트(Soft Delete) 방식을 적용함.
 * **사용자 상태 추적 (Presence)**: Supabase Realtime Presence(인메모리 웹소켓)를 사용하여 데이터베이스 부하 없이 실시간 유저 온라인/오프라인 상태를 추적 및 동기화함.
 * **파일 및 스토리지**: 아바타 및 채팅방 업로드 미디어를 Supabase Storage에 저장하고, DB 권한(RLS) 정책과 통합하여 보안을 유지함.
-
 
 
