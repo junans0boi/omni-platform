@@ -38,7 +38,7 @@ alter table public.profiles
   add constraint profiles_username_key unique (username),
   add constraint profiles_auth_user_id_key unique (auth_user_id),
   add constraint profiles_auth_user_id_fkey foreign key (auth_user_id) references auth.users(id) on delete set null,
-  add constraint profiles_account_status_check check (account_status in ('ACTIVE', 'EXIT_PENDING', 'DISABLED', 'ANONYMIZED'));
+  add constraint profiles_account_status_check check (account_status in ('ACTIVE', 'CLAIM_PENDING', 'EXIT_PENDING', 'DISABLED', 'ANONYMIZED'));
 
 -- Existing Auth-backed rows keep their UUID association. Missing Auth identities remain
 -- unclaimed and are handled by #56; email collision checks also belong to auth.users there.
@@ -47,6 +47,7 @@ set auth_user_id = p.id
 where p.auth_user_id is null
   and exists (select 1 from auth.users as u where u.id = p.id);
 
+alter table public.spaces drop constraint if exists spaces_invite_code_key;
 alter table public.spaces
   alter column name set not null,
   alter column invite_code set not null,
