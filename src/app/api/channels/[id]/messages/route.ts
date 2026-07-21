@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { messageBroker } from "@/lib/events";
+import {
+  clampMessagePageLimit,
+  decodeMessageCursor,
+  encodeMessageCursor,
+} from "@/lib/message-pagination";
 
 // GET: fetch messages for the channel
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getSessionUser();
@@ -38,8 +43,27 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const limit = clampMessagePageLimit(req.nextUrl.searchParams.get("limit"));
+    const cursorValue = req.nextUrl.searchParams.get("before");
+    let cursor: ReturnType<typeof decodeMessageCursor> | null = null;
+    if (cursorValue) {
+      try {
+        cursor = decodeMessageCursor(cursorValue);
+      } catch {
+        return NextResponse.json({ error: "Invalid message cursor" }, { status: 400 });
+      }
+    }
+
     const messages = await prisma.message.findMany({
-      where: { channelId },
+      where: {
+        channelId,
+        ...(cursor ? {
+          OR: [
+            { createdAt: { lt: new Date(cursor.createdAt) } },
+            { createdAt: new Date(cursor.createdAt), id: { lt: cursor.id } },
+          ],
+        } : {}),
+      },
       include: {
         profile: {
           select: {
@@ -63,10 +87,19 @@ export async function GET(
           orderBy: { createdAt: "asc" },
         },
       },
-      orderBy: { createdAt: "asc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
     });
 
-    return NextResponse.json(messages);
+    const hasMore = messages.length > limit;
+    const items = messages.slice(0, limit).reverse();
+    const oldest = items[0];
+    return NextResponse.json({
+      items,
+      nextCursor: hasMore && oldest
+        ? encodeMessageCursor({ id: oldest.id, createdAt: oldest.createdAt.toISOString() })
+        : null,
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

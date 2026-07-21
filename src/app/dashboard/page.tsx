@@ -11,6 +11,8 @@ import {
   ImageIcon, Smile, PanelLeftClose, PanelLeft, Check
 } from "lucide-react";
 import VoiceGrid from "@/components/VoiceGrid";
+import { LocaleSettings } from "@/components/LocaleSettings";
+import { useI18n } from "@/i18n/I18nProvider";
 
 type ModalType =
   | "createSpace"
@@ -25,9 +27,11 @@ const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { t } = useI18n();
 
   const {
     profile, spaces, categories, channels, members, messages,
+    messageHistoryCursor, isLoadingOlderMessages, loadOlderMessages,
     activeSpaceId, activeChannelId, presenceUsers,
     theme, unreadBadges,
     setTheme, setProfile, fetchSpaces, fetchSpaceData, fetchMessages,
@@ -504,15 +508,15 @@ export default function DashboardPage() {
         <div className="flex h-14 shrink-0 items-center gap-2 border-b border-white/5 px-3">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-tr from-blue-500 to-violet-600 text-sm font-bold text-white">Ω</div>
           <select
-            aria-label="Select space"
+            aria-label={t("dashboard.selectSpace")}
             value={activeSpaceId ?? ""}
             onChange={(event) => setActiveSpaceId(event.target.value || null)}
             className="min-w-0 flex-1 truncate rounded-lg border border-white/10 bg-zinc-900 px-2 py-1.5 text-sm font-semibold text-white outline-hidden focus:border-blue-500"
           >
-            <option value="" disabled>{spaces.length ? "Select a space" : "No spaces yet"}</option>
+            <option value="" disabled>{spaces.length ? t("dashboard.selectASpace") : t("dashboard.noSpaces")}</option>
             {spaces.map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}
           </select>
-          <button onClick={() => openModal("createSpace")} title="Create Space" aria-label="Create Space"
+          <button onClick={() => openModal("createSpace")} title={t("dialog.createSpace")} aria-label={t("dialog.createSpace")}
             className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white">
             <Plus className="h-4 w-4" />
           </button>
@@ -520,7 +524,7 @@ export default function DashboardPage() {
         {activeSpace ? (
           <>
             <div className="flex h-11 shrink-0 items-center justify-between border-b border-white/5 px-4">
-              <h2 className="truncate text-xs font-semibold text-zinc-400">Space actions</h2>
+              <h2 className="truncate text-xs font-semibold text-zinc-400">{t("dashboard.spaceActions")}</h2>
               <div className="flex gap-1">
                 <button 
                   onClick={() => {
@@ -598,7 +602,7 @@ export default function DashboardPage() {
               
               {isAdminOrOwner && (
                 <button onClick={() => openModal("createCategory")} className={`flex w-full items-center gap-1.5 px-2 py-1.5 text-xs rounded-lg transition-colors mt-2 ${theme === 'dark' ? 'text-zinc-500 hover:bg-white/5 hover:text-zinc-300' : 'text-zinc-500 hover:bg-black/5 hover:text-zinc-700'}`}>
-                  <Plus className="h-3.5 w-3.5" /> Add Category
+                  <Plus className="h-3.5 w-3.5" /> {t("dashboard.addCategory")}
                 </button>
               )}
             </div>
@@ -606,7 +610,7 @@ export default function DashboardPage() {
             {/* Profile Bar */}
             {profile && (
               <div className={`flex h-[60px] shrink-0 items-center gap-2 border-t px-3 ${theme === 'dark' ? 'border-white/5 bg-zinc-900' : 'border-zinc-200 bg-white'}`}>
-                <button onClick={() => openModal("editProfile")} className="group relative shrink-0">
+                <button onClick={() => openModal("editProfile")} aria-label={t("dashboard.profile")} className="group relative shrink-0">
                   <div className={`flex h-9 w-9 items-center justify-center rounded-full overflow-hidden ${theme === 'dark' ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
                     {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" /> : <span className="text-xs uppercase font-bold">{profile.username.substring(0,2)}</span>}
                   </div>
@@ -625,7 +629,7 @@ export default function DashboardPage() {
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center px-6 text-center text-zinc-500">
             <Compass className="mb-3 h-9 w-9 stroke-1" />
-            <p className="text-sm">Create or join a Space to begin.</p>
+            <p className="text-sm">{t("dashboard.empty.space")}</p>
           </div>
         )}
       </div>
@@ -664,6 +668,18 @@ export default function DashboardPage() {
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-1 no-scrollbar">
+              {messageHistoryCursor && (
+                <div className="flex justify-center pb-3">
+                  <button
+                    type="button"
+                    disabled={isLoadingOlderMessages}
+                    onClick={() => void loadOlderMessages()}
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:bg-white/10 disabled:opacity-50"
+                  >
+                    {isLoadingOlderMessages ? "Loading…" : "Load older messages"}
+                  </button>
+                </div>
+              )}
               {messages.map((msg, idx) => {
                 const prevMsg = messages[idx - 1];
                 const isConsecutive = prevMsg && prevMsg.profileId === msg.profileId && (new Date(msg.createdAt).getTime() - new Date(prevMsg.createdAt).getTime() < 300000);
@@ -673,7 +689,9 @@ export default function DashboardPage() {
                   : false;
 
                 return (
-                  <div key={msg.id} className={`group relative flex gap-3 px-2 py-1 -mx-2 rounded-lg transition-colors ${isMentioned ? (theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50') : (theme === 'dark' ? 'hover:bg-white/5' : 'hover:bg-slate-50')} ${!isConsecutive ? 'mt-4' : ''}`}>
+                  <div key={msg.id}
+                    style={{ contentVisibility: "auto", containIntrinsicSize: "0 72px" }}
+                    className={`group relative flex gap-3 px-2 py-1 -mx-2 rounded-lg transition-colors ${isMentioned ? (theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50') : (theme === 'dark' ? 'hover:bg-white/5' : 'hover:bg-slate-50')} ${!isConsecutive ? 'mt-4' : ''}`}>
                     
                     {/* Avatar or Timestamp */}
                     <div className="w-10 shrink-0 flex justify-center mt-0.5">
@@ -823,8 +841,8 @@ export default function DashboardPage() {
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center text-center opacity-60">
             <Compass className="h-12 w-12 stroke-1 mb-4" />
-            <h3 className="text-lg font-bold mb-1">Welcome to Omni-Platform</h3>
-            <p className="text-sm">Select a channel to start communicating.</p>
+            <h3 className="text-lg font-bold mb-1">{t("dashboard.welcome")}</h3>
+            <p className="text-sm">{t("dashboard.selectChannel")}</p>
           </div>
         )}
       </div>
@@ -846,9 +864,9 @@ export default function DashboardPage() {
           >
             <div className="flex h-14 shrink-0 items-center gap-2 border-b border-white/5 px-4">
               <Users className="h-4 w-4 text-zinc-500" />
-              <h2 id="members-dialog-title" className="flex-1 text-sm font-bold">Members</h2>
+              <h2 id="members-dialog-title" className="flex-1 text-sm font-bold">{t("dashboard.members")}</h2>
               <span className="text-xs text-zinc-500">{members.length}</span>
-              <button autoFocus onClick={() => setIsMemberDialogOpen(false)} aria-label="Close members" className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white">
+              <button autoFocus onClick={() => setIsMemberDialogOpen(false)} aria-label={t("dialog.closeMembers")} className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -905,34 +923,34 @@ export default function DashboardPage() {
           <div className={`w-full max-w-md rounded-2xl p-6 shadow-2xl ${theme === 'dark' ? 'bg-zinc-900 border border-zinc-800' : 'bg-white'}`}>
             {modal === "createSpace" && (
               <form onSubmit={handleCreateSpace} className="flex flex-col gap-4">
-                <h2 className="text-xl font-bold">Create Space</h2>
+                <h2 className="text-xl font-bold">{t("dialog.createSpace")}</h2>
                 <input autoFocus value={newSpaceName} onChange={(e) => setNewSpaceName(e.target.value)} placeholder="Space Name" className={`w-full rounded-xl px-4 py-3 outline-hidden border ${theme === 'dark' ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-200'}`} />
                 <input value={newSpaceAvatar} onChange={(e) => setNewSpaceAvatar(e.target.value)} placeholder="Avatar URL (Optional)" className={`w-full rounded-xl px-4 py-3 outline-hidden border ${theme === 'dark' ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-200'}`} />
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={closeModal} className={`flex-1 rounded-xl py-3 font-bold transition-colors ${theme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-slate-100 hover:bg-slate-200'}`}>Cancel</button>
-                  <button type="submit" disabled={formLoading} className="flex-1 rounded-xl bg-blue-600 py-3 font-bold text-white transition-colors hover:bg-blue-500 disabled:opacity-50">Create</button>
+                  <button type="button" onClick={closeModal} className={`flex-1 rounded-xl py-3 font-bold transition-colors ${theme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-slate-100 hover:bg-slate-200'}`}>{t("common.cancel")}</button>
+                  <button type="submit" disabled={formLoading} className="flex-1 rounded-xl bg-blue-600 py-3 font-bold text-white transition-colors hover:bg-blue-500 disabled:opacity-50">{t("dialog.create")}</button>
                 </div>
-                <div className="my-2 flex items-center gap-2"><div className={`flex-1 h-px ${theme === 'dark' ? 'bg-white/10' : 'bg-slate-200'}`} /><span className="text-xs text-zinc-500">OR</span><div className={`flex-1 h-px ${theme === 'dark' ? 'bg-white/10' : 'bg-slate-200'}`} /></div>
-                <button type="button" onClick={() => setModal("joinSpace")} className={`w-full rounded-xl py-3 font-bold transition-colors ${theme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-slate-100 hover:bg-slate-200'}`}>Join Space with Invite Code</button>
+                <div className="my-2 flex items-center gap-2"><div className={`flex-1 h-px ${theme === 'dark' ? 'bg-white/10' : 'bg-slate-200'}`} /><span className="text-xs text-zinc-500">{t("dialog.or")}</span><div className={`flex-1 h-px ${theme === 'dark' ? 'bg-white/10' : 'bg-slate-200'}`} /></div>
+                <button type="button" onClick={() => setModal("joinSpace")} className={`w-full rounded-xl py-3 font-bold transition-colors ${theme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-slate-100 hover:bg-slate-200'}`}>{t("dialog.joinWithCode")}</button>
               </form>
             )}
 
             {modal === "joinSpace" && (
               <form onSubmit={handleJoinSpace} className="flex flex-col gap-4">
-                <h2 className="text-xl font-bold">Join Space</h2>
+                <h2 className="text-xl font-bold">{t("dialog.joinSpace")}</h2>
                 <input autoFocus value={inviteCodeInput} onChange={(e) => setInviteCodeInput(e.target.value)} placeholder="Invite Code" className={`w-full rounded-xl px-4 py-3 outline-hidden border ${theme === 'dark' ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-200'}`} />
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setModal("createSpace")} className={`flex-1 rounded-xl py-3 font-bold transition-colors ${theme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-slate-100 hover:bg-slate-200'}`}>Back</button>
-                  <button type="submit" disabled={formLoading} className="flex-1 rounded-xl bg-blue-600 py-3 font-bold text-white transition-colors hover:bg-blue-500 disabled:opacity-50">Join</button>
+                  <button type="button" onClick={() => setModal("createSpace")} className={`flex-1 rounded-xl py-3 font-bold transition-colors ${theme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-slate-100 hover:bg-slate-200'}`}>{t("dialog.back")}</button>
+                  <button type="submit" disabled={formLoading} className="flex-1 rounded-xl bg-blue-600 py-3 font-bold text-white transition-colors hover:bg-blue-500 disabled:opacity-50">{t("dialog.join")}</button>
                 </div>
               </form>
             )}
 
             {modal === "createChannel" && (
               <form onSubmit={handleCreateChannel} className="flex flex-col gap-4">
-                <h2 className="text-xl font-bold">Create Channel</h2>
+                <h2 className="text-xl font-bold">{t("dialog.createChannel")}</h2>
                 <div>
                   <label className="mb-2 block text-xs font-bold text-zinc-500">CATEGORY (OPTIONAL)</label>
                   <select value={newChannelCategoryId} onChange={(e) => setNewChannelCategoryId(e.target.value)} className={`w-full rounded-xl px-4 py-3 outline-hidden border ${theme === 'dark' ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50 border-slate-200'}`}>
@@ -964,7 +982,7 @@ export default function DashboardPage() {
 
             {modal === "createCategory" && (
               <form onSubmit={handleCreateCategory} className="flex flex-col gap-4">
-                <h2 className="text-xl font-bold">Create Category</h2>
+                <h2 className="text-xl font-bold">{t("dialog.createCategory")}</h2>
                 <input autoFocus value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="CATEGORY NAME" className={`w-full rounded-xl px-4 py-3 outline-hidden border uppercase ${theme === 'dark' ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-200'}`} />
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3 pt-2">
@@ -976,7 +994,8 @@ export default function DashboardPage() {
 
             {modal === "editProfile" && (
               <form onSubmit={handleEditProfile} className="flex flex-col gap-4">
-                <h2 className="text-xl font-bold">My Profile</h2>
+                <h2 className="text-xl font-bold">{t("dashboard.profile")}</h2>
+                <LocaleSettings />
                 <div className="flex justify-center">
                   <div className="relative group overflow-hidden rounded-full h-24 w-24 border-4 border-zinc-800 bg-zinc-900 cursor-pointer" onClick={() => document.getElementById('avatar-upload')?.click()}>
                     {editAvatarPreview ? <img src={editAvatarPreview} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center text-2xl font-bold uppercase">{profile?.username.substring(0,2)}</div>}

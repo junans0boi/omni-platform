@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { PresenceSnapshot } from "@/lib/events";
+import { MAX_RETAINED_MESSAGES, mergeMessagePage } from "@/lib/message-pagination";
 
 export interface Profile {
   id: string;
@@ -126,6 +127,8 @@ interface AppState {
   channels: Channel[];
   members: Member[];
   messages: Message[];
+  messageHistoryCursor: string | null;
+  isLoadingOlderMessages: boolean;
   activeSpaceId: string | null;
   activeChannelId: string | null;
   presenceUsers: PresenceSnapshot;
@@ -147,6 +150,7 @@ interface AppState {
   fetchSpaces: () => Promise<void>;
   fetchSpaceData: (spaceId: string) => Promise<void>;
   fetchMessages: (channelId: string) => Promise<void>;
+  loadOlderMessages: () => Promise<void>;
   addMessage: (message: RealtimeMessage) => void;
   createSpace: (name: string, avatarUrl?: string) => Promise<Space | null>;
   joinSpace: (inviteCode: string) => Promise<boolean>;
@@ -175,6 +179,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   channels: [],
   members: [],
   messages: [],
+  messageHistoryCursor: null,
+  isLoadingOlderMessages: false,
   activeSpaceId: null,
   activeChannelId: null,
   presenceUsers: {},
@@ -234,16 +240,35 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const res = await fetch(`/api/channels/${channelId}/messages`);
       if (res.ok) {
-        const data: Message[] = await res.json();
+        const data: { items: Message[]; nextCursor: string | null } = await res.json();
         if (
           requestId === latestMessageFetch &&
           get().activeChannelId === channelId
         ) {
-          set({ messages: data || [] });
+          set({ messages: data.items || [], messageHistoryCursor: data.nextCursor });
         }
       }
     } catch (e) {
       console.error("Error fetching messages:", e);
+    }
+  },
+
+  loadOlderMessages: async () => {
+    const { activeChannelId, messageHistoryCursor, isLoadingOlderMessages } = get();
+    if (!activeChannelId || !messageHistoryCursor || isLoadingOlderMessages) return;
+    set({ isLoadingOlderMessages: true });
+    try {
+      const response = await fetch(`/api/channels/${activeChannelId}/messages?before=${encodeURIComponent(messageHistoryCursor)}`);
+      if (!response.ok) throw await apiError(response, "Failed to load message history");
+      const data: { items: Message[]; nextCursor: string | null } = await response.json();
+      if (get().activeChannelId === activeChannelId) {
+        set((state) => ({
+          messages: mergeMessagePage(state.messages, data.items),
+          messageHistoryCursor: data.nextCursor,
+        }));
+      }
+    } finally {
+      set({ isLoadingOlderMessages: false });
     }
   },
 
@@ -277,7 +302,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       if (state.messages.some((m) => m.id === message.id)) return state;
-      return { messages: [...state.messages, message] };
+      return { messages: [...state.messages, message].slice(-MAX_RETAINED_MESSAGES) };
     });
   },
 
@@ -402,7 +427,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
     latestMessageFetch += 1;
-    set({ activeChannelId: channelId, messages: [] });
+    set({ activeChannelId: channelId, messages: [], messageHistoryCursor: null });
     if (channelId) get().clearUnreadBadge(channelId);
   },
   setPresenceUsers: (presenceUsers) => set({ presenceUsers }),
