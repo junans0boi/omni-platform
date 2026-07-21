@@ -17,6 +17,7 @@ import { SoundSettings } from "@/components/SoundSettings";
 import { SettingsModal } from "@/components/SettingsModal";
 import { FriendsPanel } from "@/components/FriendsPanel";
 import { ChannelHeaderExtras } from "@/components/ChannelHeaderExtras";
+import { NotificationDrawer } from "@/components/NotificationDrawer";
 import { getSoundEffects } from "@/lib/browser-sound-effects";
 import { DEFAULT_SOUND_PREFERENCE, type SoundPreference } from "@/lib/sound-effects";
 import { readSoundPreference, writeSoundPreference } from "@/lib/sound-preference-storage";
@@ -780,6 +781,14 @@ export default function DashboardPage() {
                   <span className="truncate text-sm font-semibold">{profile.displayName || profile.username}</span>
                   <span className={`truncate text-xs ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-500'}`}>@{profile.username}</span>
                 </div>
+                <NotificationDrawer
+                  onSelectChannel={(sId, cId) => {
+                    if (sId) setActiveSpaceId(sId);
+                    if (cId) setActiveChannelId(cId);
+                    setMainView("space");
+                  }}
+                  onOpenFriends={() => setMainView("friends")}
+                />
                 <button onClick={() => setIsSettingsOpen(true)} className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition" title={t("settings.title")}>
                   <Settings className="h-4 w-4" />
                 </button>
