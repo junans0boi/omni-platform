@@ -38,18 +38,18 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-radial from-[#1e1b4b] via-[#09090b] to-black px-4 text-white">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-slate-100 px-4 text-zinc-900 dark:bg-radial dark:from-[#1e1b4b] dark:via-[#09090b] dark:to-black dark:text-white">
       {/* Dynamic ambient lights */}
       <div className="absolute top-[-10%] left-[-10%] h-[500px] w-[500px] rounded-full bg-purple-600/10 blur-[120px]" />
       <div className="absolute bottom-[-10%] right-[-10%] h-[500px] w-[500px] rounded-full bg-indigo-600/10 blur-[120px]" />
 
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white/90 p-8 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-white/5">
         <div className="flex flex-col items-center mb-8">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-linear-to-tr from-indigo-500 to-purple-600 text-2xl font-bold shadow-lg shadow-indigo-500/30">
             Ω
           </div>
-          <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-100">Welcome back</h2>
-          <p className="mt-1 text-sm text-zinc-400">Log in to enter the Omni-Platform</p>
+          <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Welcome back</h2>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Log in to enter the Omni-Platform</p>
         </div>
 
         {error && (
@@ -66,7 +66,7 @@ export default function LoginPage() {
             <input
               type="text"
               required
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-500 outline-hidden transition focus:border-indigo-500 focus:bg-white/10"
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 outline-hidden transition focus:border-indigo-500 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder-zinc-500 dark:focus:bg-white/10"
               placeholder="johndoe or name@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -80,7 +80,7 @@ export default function LoginPage() {
             <input
               type="password"
               required
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-500 outline-hidden transition focus:border-indigo-500 focus:bg-white/10"
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 outline-hidden transition focus:border-indigo-500 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder-zinc-500 dark:focus:bg-white/10"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -96,7 +96,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-zinc-400">
+        <p className="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
           Don&apos;t have an account?{" "}
           <Link href="/signup" className="font-semibold text-indigo-400 hover:text-indigo-300">
             Sign up

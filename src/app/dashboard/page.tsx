@@ -163,11 +163,13 @@ export default function DashboardPage() {
   // Filter members for mention dropdown
   const mentionableMembers = mentionQuery === null
     ? []
-    : members.filter((member) =>
-        (member.profile?.displayName || member.profile?.username)
-          ?.toLowerCase()
-          .includes(mentionQuery.toLowerCase())
-      );
+    : members.filter((member) => {
+        const query = mentionQuery.toLowerCase();
+        return Boolean(
+          member.profile?.username.toLowerCase().includes(query) ||
+          member.profile?.displayName?.toLowerCase().includes(query)
+        );
+      });
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const openModal = (type: ModalType) => {
@@ -518,7 +520,7 @@ export default function DashboardPage() {
       </div>
 
       {/* 2. Channel sidebar */}
-      <div className={`fixed sm:relative left-14 sm:left-auto inset-y-0 sm:inset-y-auto z-40 sm:z-20 flex flex-col border-r transition-all duration-300 overflow-hidden shrink-0 ${theme === 'dark' ? 'border-white/5 bg-[#111113]' : 'border-zinc-200 bg-[#f8fafc]'}`}
+      <div className={`fixed md:relative left-14 md:left-auto inset-y-0 md:inset-y-auto z-40 md:z-20 flex flex-col border-r transition-all duration-300 overflow-hidden shrink-0 ${theme === 'dark' ? 'border-white/5 bg-[#111113]' : 'border-zinc-200 bg-[#f8fafc]'}`}
         style={{ width: isChannelSidebarOpen ? "240px" : "0px", opacity: isChannelSidebarOpen ? 1 : 0 }}>
         {activeSpace && (
           <>
@@ -925,7 +927,7 @@ export default function DashboardPage() {
                 <div>
                   <label className="mb-2 block text-xs font-bold text-zinc-500">CHANNEL TYPE</label>
                   <div className="flex gap-2">
-                    {(["TEXT", "VOICE"] as const).map(t => (
+                    {(["TEXT", "VOICE", "STAGE"] as const).map(t => (
                       <button key={t} type="button" onClick={() => setNewChannelType(t)} className={`flex-1 rounded-xl border py-3 text-sm font-bold transition-colors ${newChannelType === t ? 'border-blue-500 bg-blue-500/10 text-blue-500' : (theme === 'dark' ? 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:bg-zinc-800' : 'border-slate-200 bg-slate-50 text-zinc-500 hover:bg-slate-100')}`}>
                         {t === "TEXT" ? <Hash className="mx-auto mb-1 h-5 w-5" /> : <Volume2 className="mx-auto mb-1 h-5 w-5" />} {t}
                       </button>

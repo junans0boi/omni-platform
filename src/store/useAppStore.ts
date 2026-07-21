@@ -70,6 +70,33 @@ export type RealtimeMessage =
 
 let latestMessageFetch = 0;
 
+function unreadStorageKey(profileId: string) {
+  return `omni-unread:${profileId}`;
+}
+
+function loadUnreadBadges(profileId: string): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    const value: unknown = JSON.parse(
+      localStorage.getItem(unreadStorageKey(profileId)) || "{}"
+    );
+    if (typeof value !== "object" || value === null) return {};
+    return Object.fromEntries(
+      Object.entries(value).filter(
+        (entry): entry is [string, number] =>
+          typeof entry[1] === "number" && entry[1] > 0
+      )
+    );
+  } catch {
+    return {};
+  }
+}
+
+function saveUnreadBadges(profileId: string | undefined, badges: Record<string, number>) {
+  if (typeof window === "undefined" || !profileId) return;
+  localStorage.setItem(unreadStorageKey(profileId), JSON.stringify(badges));
+}
+
 async function apiError(response: Response, fallback: string): Promise<Error> {
   let detail = fallback;
   try {
@@ -159,7 +186,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   isScreenSharing: false,
 
   setTheme: (theme) => set({ theme }),
-  setProfile: (profile) => set({ profile }),
+  setProfile: (profile) => set({
+    profile,
+    unreadBadges: profile ? loadUnreadBadges(profile.id) : {},
+  }),
 
   fetchSpaces: async () => {
     set({ isLoading: true });
@@ -232,11 +262,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       if (!isActiveChannel) {
-        return {
-          unreadBadges: {
+        const unreadBadges = {
           ...state.unreadBadges,
           [message.channelId]: (state.unreadBadges[message.channelId] || 0) + 1,
-          },
+        };
+        saveUnreadBadges(state.profile?.id, unreadBadges);
+        return {
+          unreadBadges,
         };
       }
 
@@ -249,6 +281,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const unreadBadges = { ...state.unreadBadges };
       delete unreadBadges[channelId];
+      saveUnreadBadges(state.profile?.id, unreadBadges);
       return { unreadBadges };
     });
   },

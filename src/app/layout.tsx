@@ -28,9 +28,17 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{const saved=localStorage.getItem("omni-theme");const dark=saved?saved==="dark":!matchMedia("(prefers-color-scheme: light)").matches;document.documentElement.classList.toggle("dark",dark)}catch{}`,
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }
