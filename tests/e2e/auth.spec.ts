@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("a new user signs up, receives a safe session, and can log back in", async ({ page }) => {
-  const username = "baseline_user";
-  const email = "baseline@example.com";
+test("a new user signs up, receives a safe session, and can log back in", async ({ page }, testInfo) => {
+  const username = `baseline_user_${testInfo.retry}`;
+  const email = `baseline-${testInfo.retry}@example.com`;
   const password = "baseline-password";
 
   await page.goto("/signup");
@@ -22,7 +22,8 @@ test("a new user signs up, receives a safe session, and can log back in", async 
   expect(sessionBody.user).not.toHaveProperty("password");
   expect(sessionBody.user).not.toHaveProperty("passwordHash");
 
-  await page.getByTitle("Log Out").click();
+  await page.getByTitle("Log Out").focus();
+  await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/login$/);
 
   await page.getByPlaceholder("johndoe or name@example.com").fill(email);

@@ -17,6 +17,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
@@ -33,11 +35,10 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run test:unit
-      - run: npm run test:e2e
-      - run: npm run build
+      - name: Run quality gates
+        env:
+          TEST_POLICY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: npm run test:ci
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
