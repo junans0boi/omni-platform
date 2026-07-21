@@ -117,6 +117,9 @@ test("two users exchange media and Stage audience remains subscribe-only", async
       "true",
     );
     await expect(ownerRemote).toHaveAttribute("data-livekit-audio-subscribed", "true");
+    const ownerVolume = ownerRemote.getByRole("slider", { name: `${owner.user.id} volume` });
+    await ownerVolume.fill("0");
+    await expect.poll(() => ownerRemote.locator("audio").evaluate((audio) => (audio as HTMLAudioElement).volume)).toBe(0);
     await expect.poll(async () =>
       (await participant(voice!.id, owner.user.id))?.tracks.some(
         (track) => track.source === TrackSource.MICROPHONE && !track.muted,
@@ -164,6 +167,8 @@ test("two users exchange media and Stage audience remains subscribe-only", async
     await expect(memberPage.getByTitle("스테이지 청취자는 화면을 공유할 수 없습니다")).toBeDisabled();
     const stageOwner = memberPage.locator(`[data-livekit-participant="${owner.user.id}"]`);
     await expect(stageOwner).toHaveAttribute("data-livekit-audio-subscribed", "true");
+    await expect(stageOwner.getByRole("slider", { name: `${owner.user.id} volume` })).toHaveValue("0");
+    await expect.poll(() => stageOwner.locator("audio").evaluate((audio) => (audio as HTMLAudioElement).volume)).toBe(0);
     await expect.poll(async () => ({
       owner: (await participant(stage.id, owner.user.id))?.permission?.canPublish,
       member: (await participant(stage.id, member.user.id))?.permission?.canPublish,

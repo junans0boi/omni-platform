@@ -1,0 +1,103 @@
+import { expect, test, type BrowserContext } from "@playwright/test";
+
+async function createUser(context: BrowserContext, username: string) {
+  const response = await context.request.post("/api/auth/signup", {
+    data: {
+      username,
+      display_name: username,
+      email: `${username}@example.com`,
+      password: "thread-e2e-password",
+    },
+  });
+  expect(response.status()).toBe(200);
+}
+
+test("two members reply and maintain a private thread across update, reconnect, and tombstone", async ({ browser }, testInfo) => {
+  const suffix = `${Date.now()}_${testInfo.retry}`;
+  const contextA = await browser.newContext({ baseURL: "http://localhost:3100" });
+  const contextB = await browser.newContext({ baseURL: "http://localhost:3100" });
+  const contextC = await browser.newContext({ baseURL: "http://localhost:3100" });
+  await createUser(contextA, `thread_a_${suffix}`);
+  await createUser(contextB, `thread_b_${suffix}`);
+  await createUser(contextC, `thread_c_${suffix}`);
+
+  const spaceResponse = await contextA.request.post("/api/spaces", { data: { name: "Thread Space" } });
+  expect(spaceResponse.status()).toBe(200);
+  const space = await spaceResponse.json() as { id: string; inviteCode: string };
+  expect((await contextB.request.put("/api/spaces", { data: { invite_code: space.inviteCode } })).status()).toBe(200);
+  const spaceDetails = await (await contextA.request.get(`/api/spaces/${space.id}`)).json() as {
+    channels: Array<{ id: string; type: string }>;
+  };
+  const channelId = spaceDetails.channels.find((channel) => channel.type === "TEXT")!.id;
+
+  const rootResponse = await contextA.request.post(`/api/channels/${channelId}/messages`, {
+    data: { content: "durable thread root" },
+  });
+  expect(rootResponse.status()).toBe(200);
+  const root = await rootResponse.json() as { id: string };
+
+  expect((await contextC.request.get(`/api/channels/${channelId}/messages/${root.id}/thread`)).status()).toBe(403);
+
+  const secondSpace = await (await contextA.request.post("/api/spaces", { data: { name: "Other Space" } })).json() as { id: string };
+  const secondDetails = await (await contextA.request.get(`/api/spaces/${secondSpace.id}`)).json() as {
+    channels: Array<{ id: string; type: string }>;
+  };
+  const secondChannelId = secondDetails.channels.find((channel) => channel.type === "TEXT")!.id;
+  const crossChannel = await contextA.request.post(`/api/channels/${secondChannelId}/messages`, {
+    data: { content: "invalid cross-channel reply", replyToId: root.id },
+  });
+  expect(crossChannel.status()).toBe(400);
+  expect(await crossChannel.json()).toMatchObject({ error: "cross_channel_reference" });
+
+  const pageA = await contextA.newPage();
+  const pageB = await contextB.newPage();
+  await pageA.goto("/dashboard");
+  await pageB.goto("/dashboard");
+  const rootRowA = pageA.getByTestId("message-row").filter({ hasText: "durable thread root" });
+  const rootRowB = pageB.getByTestId("message-row").filter({ hasText: "durable thread root" });
+  await expect(rootRowA).toBeVisible();
+  await expect(rootRowB).toBeVisible();
+
+  await rootRowB.getByRole("button", { name: "Reply to message" }).click();
+  const messageInput = pageB.locator('input[placeholder^="Message #"]');
+  await messageInput.fill("inline reply stays in feed");
+  await messageInput.press("Enter");
+  const inlineRow = pageB.getByTestId("message-row").filter({ hasText: "inline reply stays in feed" });
+  await expect(inlineRow).toContainText("durable thread root");
+  await expect(inlineRow.getByRole("button")).toContainText("thread_a_");
+
+  const nestedReplyResponse = await contextA.request.post(`/api/channels/${channelId}/messages`, {
+    data: { content: "invalid nested reply", replyToId: (await inlineRow.getAttribute("data-message-id"))! },
+  });
+  expect(nestedReplyResponse.status()).toBe(400);
+  expect(await nestedReplyResponse.json()).toMatchObject({ error: "nested_thread_reference" });
+
+  await rootRowB.getByRole("button", { name: "Open thread" }).click();
+  const panelB = pageB.getByRole("dialog", { name: "Thread" });
+  await panelB.getByLabel("Reply to thread").fill("first panel reply");
+  await panelB.getByRole("button", { name: "Send thread reply" }).click();
+  await expect(panelB.getByTestId("thread-reply")).toContainText("first panel reply");
+  await expect(pageB.getByTestId("message-row").filter({ hasText: "first panel reply" })).toHaveCount(0);
+
+  await rootRowA.getByRole("button", { name: "Open thread" }).click();
+  const panelA = pageA.getByRole("dialog", { name: "Thread" });
+  await expect(panelA).toContainText("first panel reply");
+
+  await panelB.getByRole("button", { name: "Edit thread reply" }).click();
+  await panelB.getByLabel("Edit thread reply content").fill("edited panel reply");
+  await panelB.getByLabel("Edit thread reply content").press("Enter");
+  await expect(panelA).toContainText("edited panel reply");
+
+  await pageA.reload();
+  const reconnectedRoot = pageA.getByTestId("message-row").filter({ hasText: "durable thread root" });
+  await expect(reconnectedRoot).toBeVisible();
+  await reconnectedRoot.getByRole("button", { name: "Open thread" }).click();
+  await expect(pageA.getByRole("dialog", { name: "Thread" })).toContainText("edited panel reply");
+
+  await panelB.getByRole("button", { name: "Delete thread reply" }).click();
+  await expect(pageA.getByRole("dialog", { name: "Thread" })).toContainText("[deleted message]");
+
+  await contextA.close();
+  await contextB.close();
+  await contextC.close();
+});

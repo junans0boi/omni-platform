@@ -1,6 +1,7 @@
 "use client";
 
 import type { SoundPreference } from "@/lib/sound-effects";
+import { useI18n } from "@/i18n/I18nProvider";
 
 export function SoundSettings({
   value,
@@ -9,11 +10,12 @@ export function SoundSettings({
   value: SoundPreference;
   onChange: (value: SoundPreference) => void;
 }) {
+  const { t } = useI18n();
   return (
     <fieldset className="space-y-3">
-      <legend className="text-sm font-semibold">효과음</legend>
+      <legend className="text-sm font-semibold">{t("settings.sound.label")}</legend>
       <label className="flex items-center justify-between gap-4 text-sm">
-        <span>효과음 사용</span>
+        <span>{t("settings.sound.enabled")}</span>
         <input
           type="checkbox"
           checked={value.enabled}
@@ -22,7 +24,7 @@ export function SoundSettings({
       </label>
       <label className="block text-sm">
         <span className="flex justify-between gap-4">
-          <span>효과음 볼륨</span>
+          <span>{t("settings.sound.volume")}</span>
           <output>{value.masterVolume}%</output>
         </span>
         <input
@@ -33,7 +35,7 @@ export function SoundSettings({
           step="1"
           value={value.masterVolume}
           disabled={!value.enabled}
-          aria-label="효과음 볼륨"
+          aria-label={t("settings.sound.volume")}
           onChange={(event) =>
             onChange({ ...value, masterVolume: Number(event.target.value) })
           }

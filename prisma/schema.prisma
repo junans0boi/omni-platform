@@ -8,20 +8,26 @@ generator client {
 }
 
 model Profile {
-  id           String     @id @default(uuid())
-  username     String     @unique
-  email        String?    @unique
-  displayName  String?
-  avatarUrl    String?
-  password     String? // Legacy plaintext credential; cleared after a successful login
-  passwordHash String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  spaces       Space[]    @relation("SpaceOwner")
-  members      Member[]
-  messages     Message[]
-  reactions    Reaction[]
-  sessions     Session[]
+  id                   String              @id @default(uuid())
+  username             String              @unique
+  email                String?             @unique
+  displayName          String?
+  avatarUrl            String?
+  password             String? // Legacy plaintext credential; cleared after a successful login
+  passwordHash         String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  spaces               Space[]             @relation("SpaceOwner")
+  members              Member[]
+  messages             Message[]
+  reactions            Reaction[]
+  sessions             Session[]
+  friendshipsAsA       Friendship[]        @relation("FriendshipProfileA")
+  friendshipsAsB       Friendship[]        @relation("FriendshipProfileB")
+  requestedFriendships Friendship[]        @relation("FriendshipRequester")
+  blockedFriendships   Friendship[]        @relation("FriendshipBlocker")
+  directParticipations DirectParticipant[]
+  directMessages       DirectMessage[]
 }
 
 model Session {
@@ -48,6 +54,7 @@ model Space {
   categories Category[]
   channels   Channel[]
   members    Member[]
+  roles      Role[]
 }
 
 model Category {
@@ -74,27 +81,73 @@ model Channel {
 }
 
 model Member {
-  id        String   @id @default(uuid())
-  spaceId   String
-  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  profileId String
-  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  role      String   @default("MEMBER") // OWNER, ADMIN, MEMBER
-  createdAt DateTime @default(now())
+  id              String           @id @default(uuid())
+  spaceId         String
+  space           Space            @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  profileId       String
+  profile         Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  role            String           @default("MEMBER") // OWNER, ADMIN, MEMBER
+  createdAt       DateTime         @default(now())
+  membershipRoles MembershipRole[]
 
   @@unique([spaceId, profileId])
 }
 
+model Role {
+  id          String           @id @default(uuid())
+  spaceId     String
+  space       Space            @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name        String
+  position    Int              @default(0)
+  colorHex    String?
+  badgeKey    String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  permissions RolePermission[]
+  memberships MembershipRole[]
+
+  @@unique([spaceId, name])
+  @@index([spaceId])
+}
+
+model RolePermission {
+  roleId     String
+  role       Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission String
+
+  @@id([roleId, permission])
+}
+
+model MembershipRole {
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  roleId   String
+  role     Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([memberId, roleId])
+  @@index([roleId])
+}
+
 model Message {
-  id        String     @id @default(uuid())
-  channelId String
-  channel   Channel    @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  profileId String
-  profile   Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  content   String
-  createdAt DateTime   @default(now())
-  editedAt  DateTime?
-  reactions Reaction[]
+  id            String     @id @default(uuid())
+  channelId     String
+  channel       Channel    @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  profileId     String
+  profile       Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  content       String
+  createdAt     DateTime   @default(now())
+  editedAt      DateTime?
+  deletedAt     DateTime?
+  replyToId     String?
+  replyTo       Message?   @relation("InlineReplies", fields: [replyToId], references: [id], onDelete: Restrict)
+  inlineReplies Message[]  @relation("InlineReplies")
+  threadRootId  String?
+  threadRoot    Message?   @relation("ThreadReplies", fields: [threadRootId], references: [id], onDelete: Restrict)
+  threadReplies Message[]  @relation("ThreadReplies")
+  reactions     Reaction[]
+
+  @@index([channelId, threadRootId, createdAt, id])
+  @@index([replyToId])
 }
 
 model Reaction {
@@ -107,4 +160,59 @@ model Reaction {
   createdAt DateTime @default(now())
 
   @@unique([messageId, profileId, emoji])
+}
+
+model Friendship {
+  id            String              @id @default(uuid())
+  profileAId    String
+  profileA      Profile             @relation("FriendshipProfileA", fields: [profileAId], references: [id], onDelete: Cascade)
+  profileBId    String
+  profileB      Profile             @relation("FriendshipProfileB", fields: [profileBId], references: [id], onDelete: Cascade)
+  requestedById String
+  requestedBy   Profile             @relation("FriendshipRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  blockedById   String?
+  blockedBy     Profile?            @relation("FriendshipBlocker", fields: [blockedById], references: [id], onDelete: SetNull)
+  status        String              @default("PENDING") // PENDING, ACCEPTED, DECLINED, REMOVED, BLOCKED
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  conversation  DirectConversation?
+
+  @@unique([profileAId, profileBId])
+  @@index([profileAId, status])
+  @@index([profileBId, status])
+}
+
+model DirectConversation {
+  id           String              @id @default(uuid())
+  friendshipId String              @unique
+  friendship   Friendship          @relation(fields: [friendshipId], references: [id], onDelete: Cascade)
+  createdAt    DateTime            @default(now())
+  participants DirectParticipant[]
+  messages     DirectMessage[]
+}
+
+model DirectParticipant {
+  id             String             @id @default(uuid())
+  conversationId String
+  conversation   DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  profileId      String
+  profile        Profile            @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt      DateTime           @default(now())
+
+  @@unique([conversationId, profileId])
+  @@index([profileId, conversationId])
+}
+
+model DirectMessage {
+  id             String             @id @default(uuid())
+  conversationId String
+  conversation   DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  profileId      String
+  profile        Profile            @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  content        String
+  createdAt      DateTime           @default(now())
+  editedAt       DateTime?
+
+  @@index([conversationId, createdAt, id])
+  @@index([profileId])
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { can } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
   const room = req.nextUrl.searchParams.get("room");
@@ -67,7 +68,7 @@ export async function GET(req: NextRequest) {
 
     // 4. Determine publishing permissions based on roles & stage channel type
     const isStage = channel.type === "STAGE";
-    const canPublish = !isStage || member.role === "ADMIN" || member.role === "OWNER";
+    const canPublish = !isStage || await can(user.id, channel.spaceId, "CONTROL_VOICE");
 
     // 5. Generate LiveKit token
     const at = new AccessToken(apiKey, apiSecret, {

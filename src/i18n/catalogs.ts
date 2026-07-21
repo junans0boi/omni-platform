@@ -53,6 +53,9 @@ const en = {
   "settings.locale.ko": "한국어",
   "settings.locale.en": "English",
   "settings.locale.current": "Current language: {locale}",
+  "settings.sound.label": "Sound effects",
+  "settings.sound.enabled": "Enable sound effects",
+  "settings.sound.volume": "Sound effects volume",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -111,6 +114,9 @@ const ko: Catalog = {
   "settings.locale.ko": "한국어",
   "settings.locale.en": "English",
   "settings.locale.current": "현재 언어: {locale}",
+  "settings.sound.label": "효과음",
+  "settings.sound.enabled": "효과음 사용",
+  "settings.sound.volume": "효과음 볼륨",
 };
 
 export const catalogs: Record<Locale, Catalog> = { ko, en };

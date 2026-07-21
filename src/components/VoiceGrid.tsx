@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ConnectionState,
   Room,
@@ -12,7 +12,13 @@ import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import { getSoundEffects } from "@/lib/browser-sound-effects";
 import { currentDocumentVisibility, shouldRenderVideo } from "@/lib/media-visibility";
-import { Mic, MicOff, Video, VideoOff, Monitor, PhoneOff, ChevronUp, ChevronDown } from "lucide-react";
+import {
+  DEFAULT_PARTICIPANT_VOLUME,
+  clampParticipantVolume,
+  readParticipantVolumes,
+  writeParticipantVolumes,
+} from "@/lib/participant-volume";
+import { Mic, MicOff, Video, VideoOff, Monitor, PhoneOff, ChevronUp, ChevronDown, Volume2 } from "lucide-react";
 
 export default function VoiceGrid() {
   const {
@@ -25,6 +31,7 @@ export default function VoiceGrid() {
     toggleMute,
     toggleCamera,
     toggleScreenShare,
+    profile,
   } = useAppStore(useShallow((state) => ({
     livekitToken: state.livekitToken,
     activeVoiceChannelId: state.activeVoiceChannelId,
@@ -35,6 +42,7 @@ export default function VoiceGrid() {
     toggleMute: state.toggleMute,
     toggleCamera: state.toggleCamera,
     toggleScreenShare: state.toggleScreenShare,
+    profile: state.profile,
   })));
 
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -50,6 +58,10 @@ export default function VoiceGrid() {
     hasScreenShare: false,
   });
   const [audioBlocked, setAudioBlocked] = useState(false);
+  const [participantVolumeOverride, setParticipantVolumeOverride] = useState<{
+    profileId: string;
+    values: Record<string, number>;
+  } | null>(null);
   const [documentVisibility, setDocumentVisibility] =
     useState<DocumentVisibilityState>(currentDocumentVisibility);
   const roomRef = useRef<Room | null>(null);
@@ -59,6 +71,27 @@ export default function VoiceGrid() {
   const canPublish = getCanPublish(livekitToken);
   const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "";
   const renderVideo = shouldRenderVideo(isCollapsed, documentVisibility);
+
+  const storedParticipantVolumes = useMemo(
+    () => profile && typeof window !== "undefined"
+      ? readParticipantVolumes(profile.id, window.localStorage)
+      : {},
+    [profile],
+  );
+  const participantVolumes = profile && participantVolumeOverride?.profileId === profile.id
+    ? participantVolumeOverride.values
+    : storedParticipantVolumes;
+
+  const setParticipantVolume = (participantId: string, value: number) => {
+    if (!profile || typeof window === "undefined") return;
+    const next = { ...participantVolumes, [participantId]: clampParticipantVolume(value) };
+    setParticipantVolumeOverride({ profileId: profile.id, values: next });
+    try {
+      writeParticipantVolumes(profile.id, next, window.localStorage);
+    } catch {
+      // Local storage can be unavailable; the listener-local in-memory gain still applies.
+    }
+  };
 
   useEffect(() => {
     const syncVisibility = () => setDocumentVisibility(document.visibilityState);
@@ -239,6 +272,7 @@ export default function VoiceGrid() {
           return [];
         }
         const element = publication.track.attach();
+        element.volume = (participantVolumes[p.identity] ?? DEFAULT_PARTICIPANT_VOLUME) / 100;
         container.appendChild(element);
         return [{ track: publication.track, element }];
       });
@@ -250,7 +284,7 @@ export default function VoiceGrid() {
         element.remove();
       });
     };
-  }, [remoteParticipants]);
+  }, [participantVolumes, remoteParticipants]);
 
   // Prefer screen share over camera so the emphasized tile cannot be obscured.
   useEffect(() => {
@@ -447,6 +481,19 @@ export default function VoiceGrid() {
                     {isMutedRemote && <MicOff className="h-2.5 w-2.5 text-red-400" />}
                     {p.name || p.identity}
                   </div>
+                  <label className="absolute right-1.5 bottom-1.5 flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">
+                    <span className="sr-only">{p.name || p.identity} volume</span>
+                    <Volume2 className="h-2.5 w-2.5" aria-hidden="true" />
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={participantVolumes[p.identity] ?? DEFAULT_PARTICIPANT_VOLUME}
+                      aria-label={`${p.name || p.identity} volume`}
+                      onChange={(event) => setParticipantVolume(p.identity, Number(event.target.value))}
+                      className="w-16"
+                    />
+                  </label>
                 </div>
               );
             })}

@@ -7,6 +7,35 @@ import {
   decodeMessageCursor,
   encodeMessageCursor,
 } from "@/lib/message-pagination";
+import { assertMessageReference } from "@/lib/message-threads";
+
+const messageInclude = {
+  profile: {
+    select: { id: true, username: true, displayName: true, avatarUrl: true },
+  },
+  replyTo: {
+    select: {
+      id: true,
+      content: true,
+      deletedAt: true,
+      profile: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+    },
+  },
+  reactions: {
+    include: {
+      profile: {
+        select: { id: true, username: true, displayName: true, avatarUrl: true },
+      },
+    },
+    orderBy: { createdAt: "asc" as const },
+  },
+  _count: { select: { threadReplies: true } },
+  threadReplies: {
+    select: { createdAt: true },
+    orderBy: { createdAt: "desc" as const },
+    take: 1,
+  },
+};
 
 // GET: fetch messages for the channel
 export async function GET(
@@ -57,6 +86,7 @@ export async function GET(
     const messages = await prisma.message.findMany({
       where: {
         channelId,
+        threadRootId: null,
         ...(cursor ? {
           OR: [
             { createdAt: { lt: new Date(cursor.createdAt) } },
@@ -64,29 +94,7 @@ export async function GET(
           ],
         } : {}),
       },
-      include: {
-        profile: {
-          select: {
-            id: true,
-            username: true,
-            displayName: true,
-            avatarUrl: true,
-          },
-        },
-        reactions: {
-          include: {
-            profile: {
-              select: {
-                id: true,
-                username: true,
-                displayName: true,
-                avatarUrl: true,
-              },
-            },
-          },
-          orderBy: { createdAt: "asc" },
-        },
-      },
+      include: messageInclude,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit + 1,
     });
@@ -119,7 +127,13 @@ export async function POST(
   const { id: channelId } = await params;
 
   try {
-    const { content } = await req.json();
+    const payload: unknown = await req.json();
+    const content = typeof payload === "object" && payload !== null && "content" in payload && typeof payload.content === "string"
+      ? payload.content.trim()
+      : "";
+    const replyToId = typeof payload === "object" && payload !== null && "replyToId" in payload && typeof payload.replyToId === "string"
+      ? payload.replyToId
+      : null;
     if (!content) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
     }
@@ -145,23 +159,29 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    if (replyToId) {
+      const target = await prisma.message.findUnique({
+        where: { id: replyToId },
+        select: { id: true, channelId: true, replyToId: true, threadRootId: true, deletedAt: true, content: true },
+      });
+      try {
+        assertMessageReference(channelId, "", target);
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "invalid_message_reference" },
+          { status: 400 }
+        );
+      }
+    }
+
     const message = await prisma.message.create({
       data: {
         channelId,
         profileId: user.id,
         content,
+        replyToId,
       },
-      include: {
-        profile: {
-          select: {
-            id: true,
-            username: true,
-            displayName: true,
-            avatarUrl: true,
-          },
-        },
-        reactions: true,
-      },
+      include: messageInclude,
     });
 
     // Notify listeners via Event Broker

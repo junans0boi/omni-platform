@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { can } from "@/lib/rbac";
 
 // PATCH /api/members/[id] — Change member role (Owner only)
 export async function PATCH(
@@ -75,9 +76,9 @@ export async function DELETE(
     });
 
     const isSelf = target.profileId === user.id;
-    const isAdminOrOwner = requester && ["ADMIN", "OWNER"].includes(requester.role);
+    const mayKick = requester && await can(user.id, target.spaceId, "KICK_MEMBERS");
 
-    if (!isSelf && !isAdminOrOwner) {
+    if (!isSelf && !mayKick) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { can } from "@/lib/rbac";
 
 // DELETE /api/channels/[id] — Delete a channel (Admin/Owner only)
 export async function DELETE(
@@ -20,11 +21,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Channel not found" }, { status: 404 });
     }
 
-    const member = await prisma.member.findUnique({
-      where: { spaceId_profileId: { spaceId: channel.spaceId, profileId: user.id } },
-    });
-
-    if (!member || !["OWNER", "ADMIN"].includes(member.role)) {
+    if (!(await can(user.id, channel.spaceId, "MANAGE_CHANNELS"))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -53,11 +50,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Channel not found" }, { status: 404 });
     }
 
-    const member = await prisma.member.findUnique({
-      where: { spaceId_profileId: { spaceId: channel.spaceId, profileId: user.id } },
-    });
-
-    if (!member || !["OWNER", "ADMIN"].includes(member.role)) {
+    if (!(await can(user.id, channel.spaceId, "MANAGE_CHANNELS"))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

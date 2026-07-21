@@ -2,18 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { getErrorMessage } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { can } from "@/lib/rbac";
 
 async function getManagedCategory(categoryId: string, profileId: string) {
   const category = await prisma.category.findUnique({ where: { id: categoryId } });
   if (!category) return { error: "Category not found", status: 404 } as const;
 
-  const member = await prisma.member.findUnique({
-    where: {
-      spaceId_profileId: { spaceId: category.spaceId, profileId },
-    },
-  });
-
-  if (!member || !["OWNER", "ADMIN"].includes(member.role)) {
+  if (!(await can(profileId, category.spaceId, "MANAGE_CHANNELS"))) {
     return { error: "Forbidden", status: 403 } as const;
   }
 

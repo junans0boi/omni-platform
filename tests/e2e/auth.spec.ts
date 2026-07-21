@@ -31,6 +31,12 @@ test("a new user signs up, receives a safe session, and can log back in", async 
   await expect(membersDialog).toBeHidden();
   await expect(membersButton).toBeFocused();
 
+  await page.getByRole("button", { name: "My Profile" }).click();
+  await expect(page.getByRole("group", { name: "Sound effects" })).toBeVisible();
+  await expect(page.getByRole("slider", { name: "Sound effects volume" })).toHaveValue("35");
+  await page.getByRole("checkbox", { name: "Enable sound effects" }).uncheck();
+  await page.getByRole("button", { name: "Cancel" }).click();
+
   const sessionResponse = await page.request.get("/api/auth/me");
   expect(sessionResponse.status()).toBe(200);
   const sessionBody = await sessionResponse.json();

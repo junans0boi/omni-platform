@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore, Member, Reaction } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
@@ -9,12 +9,18 @@ import { getErrorMessage } from "@/lib/errors";
 import {
   Hash, Volume2, Plus, Compass, LogOut, Trash2, Copy, X, Send,
   Users, ChevronDown, ChevronRight, Edit2, Crown, Shield, UserMinus,
-  ImageIcon, Smile, PanelLeftClose, PanelLeft, Check
+  ImageIcon, Smile, PanelLeftClose, PanelLeft, Check, MessageSquare, Reply
 } from "lucide-react";
 import VoiceGrid from "@/components/VoiceGrid";
 import { LocaleSettings } from "@/components/LocaleSettings";
+import { SoundSettings } from "@/components/SoundSettings";
+import { getSoundEffects } from "@/lib/browser-sound-effects";
+import { DEFAULT_SOUND_PREFERENCE, type SoundPreference } from "@/lib/sound-effects";
+import { readSoundPreference, writeSoundPreference } from "@/lib/sound-preference-storage";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useBoundedVirtualList } from "@/hooks/useBoundedVirtualList";
+import { ThreadPanel } from "@/components/ThreadPanel";
+import { DELETED_MESSAGE_PREVIEW, messagePreview } from "@/lib/message-threads";
 
 type ModalType =
   | "createSpace"
@@ -86,6 +92,8 @@ export default function DashboardPage() {
   const [isMemberDialogOpen, setIsMemberDialogOpen] = useState(false);
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
+  const [replyToId, setReplyToId] = useState<string | null>(null);
+  const [threadRootId, setThreadRootId] = useState<string | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
 
@@ -112,11 +120,40 @@ export default function DashboardPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+  const [soundPreferenceOverride, setSoundPreferenceOverride] = useState<{
+    profileId: string;
+    value: SoundPreference;
+  } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ type: "channel" | "category"; id: string; x: number; y: number; name: string } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
   // The product has one durable visual theme: premium dark mode.
+  const storedSoundPreference = useMemo(
+    () => profile && typeof window !== "undefined"
+      ? readSoundPreference(profile.id, window.localStorage)
+      : { ...DEFAULT_SOUND_PREFERENCE },
+    [profile],
+  );
+  const soundPreference = profile && soundPreferenceOverride?.profileId === profile.id
+    ? soundPreferenceOverride.value
+    : storedSoundPreference;
+
+  useEffect(() => {
+    getSoundEffects()?.setPreference(soundPreference);
+  }, [soundPreference]);
+
+  const updateSoundPreference = (preference: SoundPreference) => {
+    if (profile) setSoundPreferenceOverride({ profileId: profile.id, value: preference });
+    getSoundEffects()?.setPreference(preference);
+    if (!profile || typeof window === "undefined") return;
+    try {
+      writeSoundPreference(profile.id, preference, window.localStorage);
+    } catch {
+      // Effects remain usable in memory when browser storage is unavailable.
+    }
+  };
+
   useEffect(() => {
     setTheme("dark");
     document.documentElement.classList.add("dark");
@@ -205,7 +242,12 @@ export default function DashboardPage() {
   }, [channels, activeSpaceId, activeChannelId, setActiveChannelId]);
 
   useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setReplyToId(null);
+      setThreadRootId(null);
+    });
     if (activeChannelId) fetchMessages(activeChannelId);
+    return () => window.cancelAnimationFrame(frame);
   }, [activeChannelId, fetchMessages]);
 
   useEffect(() => {
@@ -444,8 +486,9 @@ export default function DashboardPage() {
     if (!content) return;
     
     try {
-      await sendMessage(activeChannelId, content);
+      await sendMessage(activeChannelId, content, replyToId);
       setMessageInput("");
+      setReplyToId(null);
       setActionError(null);
     } catch (error: unknown) {
       setActionError(getErrorMessage(error, "Failed to send message"));
@@ -526,6 +569,15 @@ export default function DashboardPage() {
     }
   };
 
+  const jumpToMessage = (messageId: string) => {
+    const index = messages.findIndex((message) => message.id === messageId);
+    if (index < 0) return;
+    messageVirtualizer.scrollToIndex(index, { align: "center" });
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)?.focus();
+    });
+  };
+
   const renderMessageContent = (content: string) => {
     const imgMatch = content.match(/!\[.*?\]\((.*?)\)/);
     const textContent = content.replace(/!\[.*?\]\((.*?)\)/g, "").trim();
@@ -561,7 +613,7 @@ export default function DashboardPage() {
       <div className="fixed md:relative left-0 inset-y-0 md:inset-y-auto z-40 md:z-20 flex flex-col overflow-hidden border-r border-white/5 bg-[#111113] transition-all duration-300 shrink-0"
         style={{ width: isChannelSidebarOpen ? "240px" : "0px", opacity: isChannelSidebarOpen ? 1 : 0 }}>
         <div className="flex h-14 shrink-0 items-center gap-2 border-b border-white/5 px-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-tr from-blue-500 to-violet-600 text-sm font-bold text-white">Ω</div>
+          <a href="/home" aria-label="Home" title="Home" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-tr from-blue-500 to-violet-600 text-sm font-bold text-white">Ω</a>
           <select
             aria-label={t("dashboard.selectSpace")}
             value={activeSpaceId ?? ""}
@@ -758,6 +810,8 @@ export default function DashboardPage() {
                     ref={messageVirtualizer.measureElement}
                     data-index={virtualRow.index}
                     data-testid="message-row"
+                    data-message-id={msg.id}
+                    tabIndex={-1}
                     style={{
                       position: "absolute",
                       top: 0,
@@ -791,6 +845,18 @@ export default function DashboardPage() {
                         </div>
                       )}
 
+                      {msg.replyTo && (
+                        <button
+                          type="button"
+                          onClick={() => jumpToMessage(msg.replyTo!.id)}
+                          className="mb-1 flex max-w-full items-center gap-2 rounded border-l-2 border-blue-500/60 bg-white/[0.03] px-2 py-1 text-left text-xs text-zinc-400 hover:bg-white/[0.07]"
+                        >
+                          <Reply className="h-3 w-3 shrink-0" />
+                          <span className="font-semibold text-zinc-300">{msg.replyTo.profile?.displayName || msg.replyTo.profile?.username}</span>
+                          <span className="truncate">{messagePreview({ content: msg.replyTo.content, deletedAt: msg.replyTo.deletedAt ?? null })}</span>
+                        </button>
+                      )}
+
                       {editingMsgId === msg.id ? (
                         <div className="mt-1">
                           <input autoFocus aria-label="Edit message content" value={editingContent} onChange={(e) => setEditingContent(e.target.value)}
@@ -798,9 +864,9 @@ export default function DashboardPage() {
                             className={`w-full rounded-lg px-3 py-2 text-sm outline-hidden border ${theme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-zinc-300'}`} />
                           <p className="text-[10px] text-zinc-500 mt-1">escape to cancel • enter to save</p>
                         </div>
-                      ) : (
-                        renderMessageContent(msg.content)
-                      )}
+                      ) : msg.deletedAt ? (
+                        <p className="text-sm italic text-zinc-500">{DELETED_MESSAGE_PREVIEW}</p>
+                      ) : renderMessageContent(msg.content)}
 
                       {/* Edited Tag */}
                       {msg.editedAt && !editingMsgId && (
@@ -825,10 +891,19 @@ export default function DashboardPage() {
                           })}
                         </div>
                       )}
+                      {(msg._count?.threadReplies ?? 0) > 0 && (
+                        <button type="button" onClick={() => setThreadRootId(msg.id)} className="mt-2 flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-blue-400 hover:bg-blue-500/10">
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          {msg._count?.threadReplies} replies
+                          {msg.threadReplies?.[0] && <span className="font-normal text-zinc-500">· {new Date(msg.threadReplies[0].createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
+                        </button>
+                      )}
                     </div>
 
                     {/* Hover Action Bar */}
                     <div className={`absolute -top-3 right-4 flex items-center rounded-lg border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity ${theme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-zinc-200'}`}>
+                      {!msg.deletedAt && <button aria-label="Reply to message" onClick={() => { setReplyToId(msg.id); inputRef.current?.focus(); }} className={`p-1.5 transition-colors ${theme === 'dark' ? 'hover:bg-zinc-700 text-zinc-300' : 'hover:bg-slate-100 text-zinc-600'}`}><Reply className="h-4 w-4" /></button>}
+                      <button aria-label="Open thread" onClick={() => setThreadRootId(msg.id)} className={`p-1.5 transition-colors ${theme === 'dark' ? 'hover:bg-zinc-700 text-zinc-300' : 'hover:bg-slate-100 text-zinc-600'}`}><MessageSquare className="h-4 w-4" /></button>
                       <div className="relative group/emoji">
                         <button aria-label="Add reaction" className={`p-1.5 transition-colors ${theme === 'dark' ? 'hover:bg-zinc-700 text-zinc-300' : 'hover:bg-slate-100 text-zinc-600'}`}><Smile className="h-4 w-4" /></button>
                         <div className={`absolute bottom-full right-0 mb-1 hidden group-hover/emoji:flex gap-1 rounded-full px-2 py-1 border shadow-lg ${theme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-zinc-200'}`}>
@@ -837,7 +912,7 @@ export default function DashboardPage() {
                           ))}
                         </div>
                       </div>
-                      {(isMe || isAdminOrOwner) && (
+                      {!msg.deletedAt && (isMe || isAdminOrOwner) && (
                         <>
                           <div className={`w-px h-4 ${theme === 'dark' ? 'bg-zinc-700' : 'bg-zinc-200'}`} />
                           {isMe && <button aria-label="Edit message" onClick={() => { setEditingMsgId(msg.id); setEditingContent(msg.content); }} className={`p-1.5 transition-colors ${theme === 'dark' ? 'hover:bg-zinc-700 text-zinc-300' : 'hover:bg-slate-100 text-zinc-600'}`}><Edit2 className="h-4 w-4" /></button>}
@@ -860,6 +935,17 @@ export default function DashboardPage() {
                   <button type="button" onClick={() => setActionError(null)} aria-label="Dismiss error"><X className="h-3.5 w-3.5" /></button>
                 </div>
               )}
+              {replyToId && (() => {
+                const target = messages.find((message) => message.id === replyToId);
+                return target ? (
+                  <div className="mb-2 flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-xs text-zinc-300">
+                    <Reply className="h-3.5 w-3.5 text-blue-400" />
+                    <span>Replying to <strong>{target.profile?.displayName || target.profile?.username}</strong></span>
+                    <span className="min-w-0 flex-1 truncate text-zinc-500">{messagePreview({ content: target.content, deletedAt: target.deletedAt ?? null })}</span>
+                    <button type="button" onClick={() => setReplyToId(null)} aria-label="Cancel reply" className="rounded p-1 hover:bg-white/10"><X className="h-3.5 w-3.5" /></button>
+                  </div>
+                ) : null;
+              })()}
               {/* Image Preview */}
               {imagePreview && (
                 <div className={`mb-2 inline-flex items-center gap-3 rounded-xl border p-2 shadow-sm ${theme === 'dark' ? 'bg-zinc-800 border-white/10' : 'bg-white border-slate-200'}`}>
@@ -920,6 +1006,15 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {threadRootId && activeChannelId && profile && (
+        <ThreadPanel
+          channelId={activeChannelId}
+          rootId={threadRootId}
+          currentProfileId={profile.id}
+          onClose={() => setThreadRootId(null)}
+        />
+      )}
 
       {/* Member directory overlay: never consumes a permanent layout column. */}
       {isMemberDialogOpen && activeSpace && (
@@ -1070,6 +1165,7 @@ export default function DashboardPage() {
               <form onSubmit={handleEditProfile} className="flex flex-col gap-4">
                 <h2 className="text-xl font-bold">{t("dashboard.profile")}</h2>
                 <LocaleSettings />
+                <SoundSettings value={soundPreference} onChange={updateSoundPreference} />
                 <div className="flex justify-center">
                   <div className="relative group overflow-hidden rounded-full h-24 w-24 border-4 border-zinc-800 bg-zinc-900 cursor-pointer" onClick={() => document.getElementById('avatar-upload')?.click()}>
                     {editAvatarPreview ? <img src={editAvatarPreview} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center text-2xl font-bold uppercase">{profile?.username.substring(0,2)}</div>}

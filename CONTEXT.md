@@ -69,6 +69,10 @@ Idea ──> Research ──> Prototype ──> PRD ──> Kanban ──> Execu
 * **VoiceChannel (음성 채널)**: WebRTC/LiveKit 기반의 소규모 통화 및 화면 공유 채널.
 * **StageChannel (스테이지 채널)**: 강사/발표자 1인 대 대규모 수강생 형태의 방송 채널.
 * **Role & Permission (역할 및 권한)**: 카테고리/채널별 접근 및 발언 권한 제어.
+* **Friendship (친구 관계)**: 두 Profile의 순서 없는 canonical pair. 요청자와 `PENDING`, `ACCEPTED`, `DECLINED`, `REMOVED`, `BLOCKED` 상태를 가지며 같은 pair에는 하나만 존재한다.
+* **Direct Conversation (1:1 대화)**: 수락된 Friendship에서 한 번만 생성되는 두 Profile 전용 대화. Space Membership과 독립된 Home 접근 경계다.
+* **Direct Participant (DM 참여자)**: Direct Conversation에 고정된 두 Profile 중 하나. 참여자만 대화 목록·기록·private Realtime topic을 볼 수 있다.
+* **Direct Message (개인 메시지)**: Direct Conversation 안에서 교환되는 메시지. 수락된 Friendship일 때만 새로 보낼 수 있다.
 
 ---
 
@@ -92,4 +96,4 @@ Idea ──> Research ──> Prototype ──> PRD ──> Kanban ──> Execu
 * **Space owner 승계**: 활성 Space는 정확히 한 명의 활성 owner를 가진다. owner는 탈퇴 전에 각 Space를 같은 Space의 활성 멤버에게 명시적으로 승계하거나 archive해야 하며, 임의의 자동 승계는 하지 않는다. 법적 삭제 요청에 승계 선택이 없으면 해당 Space를 archive한다.
 * **사용자 상태 추적 (Presence)**: Supabase Realtime Presence(인메모리 웹소켓)를 사용하여 데이터베이스 부하 없이 실시간 유저 온라인/오프라인 상태를 추적 및 동기화함.
 * **파일 및 스토리지**: 아바타 및 채팅방 업로드 미디어를 Supabase Storage에 저장하고, DB 권한(RLS) 정책과 통합하여 보안을 유지함.
-
+* **친구 해제 및 차단**: 친구 해제 또는 어느 한쪽의 차단은 즉시 양쪽의 새 DM 전송을 중단한다. 기존 대화는 두 원래 참여자에게만 계속 보존·조회되며 제3자에게 공개되지 않는다. 차단은 차단한 Profile만 해제할 수 있고, 해제 뒤에는 새 친구 요청·수락이 필요하다.

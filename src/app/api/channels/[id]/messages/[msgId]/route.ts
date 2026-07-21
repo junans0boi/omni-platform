@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { messageBroker } from "@/lib/events";
+import { can } from "@/lib/rbac";
 
 export async function PATCH(
   req: NextRequest,
@@ -31,6 +32,10 @@ export async function PATCH(
       return NextResponse.json({ error: "Message not found" }, { status: 404 });
     }
 
+    if (message.deletedAt) {
+      return NextResponse.json({ error: "Deleted messages cannot be edited" }, { status: 409 });
+    }
+
     if (message.profileId !== user.id) {
       return NextResponse.json({ error: "Forbidden (You can only edit your own messages)" }, { status: 403 });
     }
@@ -51,6 +56,16 @@ export async function PATCH(
           },
         },
         reactions: true,
+        replyTo: {
+          select: {
+            id: true,
+            content: true,
+            deletedAt: true,
+            profile: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+          },
+        },
+        _count: { select: { threadReplies: true } },
+        threadReplies: { select: { createdAt: true }, orderBy: { createdAt: "desc" }, take: 1 },
       },
     });
 
@@ -99,21 +114,35 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const isOwnerOrAdmin = ["OWNER", "ADMIN"].includes(member.role);
     const isMessageAuthor = message.profileId === user.id;
 
-    if (!isOwnerOrAdmin && !isMessageAuthor) {
+    if (!isMessageAuthor && !(await can(user.id, message.channel.spaceId, "DELETE_OTHERS_MESSAGES"))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    await prisma.message.delete({
+    const deleted = await prisma.message.update({
       where: { id: msgId },
+      data: { content: "", deletedAt: new Date() },
+      include: {
+        profile: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+        reactions: true,
+        replyTo: {
+          select: {
+            id: true,
+            content: true,
+            deletedAt: true,
+            profile: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+          },
+        },
+        _count: { select: { threadReplies: true } },
+        threadReplies: { select: { createdAt: true }, orderBy: { createdAt: "desc" }, take: 1 },
+      },
     });
 
     // Notify listeners via Event Broker
-    messageBroker.emit(`message:${channelId}`, { id: msgId, _type: "DELETE" });
+    messageBroker.emit(`message:${channelId}`, { ...deleted, _type: "UPDATE" });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(deleted);
   } catch (error: unknown) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }

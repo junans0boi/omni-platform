@@ -60,6 +60,12 @@ export interface Message {
   content: string;
   createdAt: string;
   editedAt?: string | null;
+  deletedAt?: string | null;
+  replyToId?: string | null;
+  threadRootId?: string | null;
+  replyTo?: Pick<Message, "id" | "content" | "deletedAt" | "profile"> | null;
+  _count?: { threadReplies: number };
+  threadReplies?: Array<{ createdAt: string }>;
   profile?: Profile;
   reactions?: Reaction[];
 }
@@ -155,7 +161,7 @@ interface AppState {
   createSpace: (name: string, avatarUrl?: string) => Promise<Space | null>;
   joinSpace: (inviteCode: string) => Promise<boolean>;
   deleteSpace: (spaceId: string) => Promise<void>;
-  sendMessage: (channelId: string, content: string) => Promise<void>;
+  sendMessage: (channelId: string, content: string, replyToId?: string | null) => Promise<void>;
   editMessage: (channelId: string, msgId: string, content: string) => Promise<void>;
   deleteMessage: (channelId: string, msgId: string) => Promise<void>;
   toggleReaction: (channelId: string, msgId: string, emoji: string) => Promise<void>;
@@ -290,6 +296,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         };
       }
 
+      // Thread replies are rendered only in ThreadPanel. Their root summary arrives
+      // as a separate UPDATE event, keeping replies out of the channel timeline.
+      if (message.threadRootId) return state;
+
       if (!isActiveChannel) {
         const unreadBadges = {
           ...state.unreadBadges,
@@ -370,12 +380,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  sendMessage: async (channelId, content) => {
+  sendMessage: async (channelId, content, replyToId = null) => {
     try {
       const response = await fetch(`/api/channels/${channelId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, replyToId }),
       });
       if (!response.ok) throw await apiError(response, "Failed to send message");
     } catch (e) {

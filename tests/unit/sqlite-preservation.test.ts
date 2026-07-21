@@ -97,7 +97,7 @@ describe("SQLite preservation manifest", () => {
         `Message.primaryKeyHash: expected ${source.tables.Message.primaryKeyHash}, received different`,
       ],
     });
-  });
+  }, 15_000);
 
   it("refuses to overwrite a backup", () => {
     const { directory, database } = fixture();

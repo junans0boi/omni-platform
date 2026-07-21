@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { can } from "@/lib/rbac";
 
 // POST /api/spaces/[id]/categories — Create a new category
 export async function POST(
@@ -15,11 +16,7 @@ export async function POST(
   const { id: spaceId } = await params;
 
   try {
-    const member = await prisma.member.findUnique({
-      where: { spaceId_profileId: { spaceId, profileId: user.id } },
-    });
-
-    if (!member || !["OWNER", "ADMIN"].includes(member.role)) {
+    if (!(await can(user.id, spaceId, "MANAGE_CHANNELS"))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
