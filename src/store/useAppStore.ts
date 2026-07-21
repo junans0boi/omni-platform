@@ -323,8 +323,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         body: JSON.stringify({ name, avatar_url: avatarUrl }),
       });
       if (res.ok) {
-        const space = await res.json();
-        await get().fetchSpaces();
+        const space: Space = await res.json();
+        set((state) => ({
+          spaces: state.spaces.some((item) => item.id === space.id)
+            ? state.spaces
+            : [space, ...state.spaces],
+        }));
         return space;
       }
     } catch (e) {

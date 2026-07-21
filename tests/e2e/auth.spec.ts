@@ -21,6 +21,7 @@ test("a new user signs up, receives a safe session, and can log back in", async 
   await page.getByPlaceholder("Space Name").fill("Baseline Space");
   await page.getByRole("button", { name: "Create", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "Select space" })).toHaveValue(/.+/);
+  await expect(page.getByRole("combobox", { name: "Select space" }).locator("option")).toHaveCount(2);
 
   const membersButton = page.getByRole("button", { name: "View members" });
   await membersButton.click();
