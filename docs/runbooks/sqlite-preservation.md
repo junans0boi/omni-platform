@@ -22,7 +22,12 @@ tokens, or identifiers. A non-zero integrity count exits unsuccessfully.
 
 ## Deterministic comparison
 
-The target importer introduced with the isolated Supabase DDL/Auth slices must emit the same logical
+The target adapter passed to `importSQLiteSnapshot()` performs primary-key upserts for each
+dependency-ordered batch. Repeating the import is idempotent; legacy epoch milliseconds are
+converted explicitly to UTC ISO timestamps. Session rows, password material, and Profile email are
+excluded from domain import and remain owned by #56's account claim/reset path.
+
+The isolated Supabase DDL/Auth slices must emit the same logical
 manifest shape after explicit SQLite epoch-millisecond to UTC `timestamptz` conversion. Compare it
 without printing row data:
 
@@ -38,6 +43,6 @@ is audit evidence only: SQLite and Postgres necessarily have different physical 
 - `prisma/dev.db`, its backups, and `prisma/migrations/**` remain unchanged.
 - This slice deliberately excludes `Session` and Profile password fields from import payloads; the
   manifest only counts/hashes records. Supabase Auth claim/reset belongs to #56.
-- PostgreSQL insertion is gated on the lossless DDL (#55) and Auth UUID provisioning (#56). Those
-  slices must consume private data through an idempotent adapter and emit this comparator contract.
+- The concrete PostgreSQL target adapter is gated on the lossless DDL (#55) and Auth UUID
+  provisioning (#56). It consumes private batches in memory and emits this comparator contract.
 - Manifest files and database snapshots are operational artifacts and must never be committed.

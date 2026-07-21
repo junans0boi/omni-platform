@@ -8,6 +8,7 @@ import {
   compareManifests,
   createReadOnlyBackup,
 } from "../../scripts/sqlite-preservation/manifest.mjs";
+import { importSQLiteSnapshot } from "../../scripts/sqlite-preservation/importer.mjs";
 
 const temporaryDirectories: string[] = [];
 
@@ -104,5 +105,27 @@ describe("SQLite preservation manifest", () => {
     writeFileSync(backup, "keep");
     expect(() => createReadOnlyBackup(database, backup)).toThrow(/already exists/);
     expect(readFileSync(backup, "utf8")).toBe("keep");
+  });
+
+  it("imports dependency-ordered rows idempotently with UTC timestamps", async () => {
+    const { database } = fixture();
+    const stored = new Map<string, Map<string, Record<string, unknown>>>();
+    const target = {
+      async upsert(table: string, rows: Array<Record<string, unknown>>) {
+        const tableRows = stored.get(table) ?? new Map();
+        for (const row of rows) tableRows.set(String(row.id), row);
+        stored.set(table, tableRows);
+      },
+    };
+
+    await importSQLiteSnapshot(database, target);
+    await importSQLiteSnapshot(database, target);
+
+    expect([...stored.keys()]).toEqual([
+      "profiles", "spaces", "categories", "channels", "members", "messages", "reactions",
+    ]);
+    expect(stored.get("messages")?.size).toBe(1);
+    const importedMessage = [...(stored.get("messages")?.values() ?? [])][0];
+    expect(importedMessage?.created_at).toBe("2023-11-14T22:13:26.000Z");
   });
 });
