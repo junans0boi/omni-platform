@@ -8,7 +8,7 @@ import { getErrorMessage } from "@/lib/errors";
 import {
   Hash, Volume2, Plus, Compass, LogOut, Trash2, Copy, X, Send,
   Users, ChevronDown, ChevronRight, Edit2, Crown, Shield, UserMinus,
-  ImageIcon, Smile, Sun, Moon, PanelLeftClose, PanelRightClose, PanelLeft, PanelRight, Check
+  ImageIcon, Smile, PanelLeftClose, PanelLeft, Check
 } from "lucide-react";
 import VoiceGrid from "@/components/VoiceGrid";
 
@@ -46,7 +46,7 @@ export default function DashboardPage() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   
   const [isChannelSidebarOpen, setIsChannelSidebarOpen] = useState(true);
-  const [isMemberSidebarOpen, setIsMemberSidebarOpen] = useState(true);
+  const [isMemberDialogOpen, setIsMemberDialogOpen] = useState(false);
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
@@ -55,6 +55,8 @@ export default function DashboardPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const memberDialogRef = useRef<HTMLDivElement>(null);
+  const memberDialogButtonRef = useRef<HTMLButtonElement>(null);
 
   // ── Form state ────────────────────────────────────────────────────────────
   const [newSpaceName, setNewSpaceName] = useState("");
@@ -75,35 +77,58 @@ export default function DashboardPage() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
-  // ── Apply theme to document element ──────────────────────────────────────
+  // The product has one durable visual theme: premium dark mode.
   useEffect(() => {
-    const savedTheme = window.localStorage.getItem("omni-theme");
-    if (savedTheme === "light" || savedTheme === "dark") {
-      setTheme(savedTheme);
-    } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
-      setTheme("light");
-    }
+    setTheme("dark");
+    document.documentElement.classList.add("dark");
+    window.localStorage.setItem("omni-theme", "dark");
   }, [setTheme]);
-
-  useEffect(() => {
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-    window.localStorage.setItem("omni-theme", theme);
-  }, [theme]);
 
   useEffect(() => {
     const mobile = window.matchMedia("(max-width: 767px)");
     const frame = window.requestAnimationFrame(() => {
       if (mobile.matches) {
         setIsChannelSidebarOpen(false);
-        setIsMemberSidebarOpen(false);
       }
     });
     return () => window.cancelAnimationFrame(frame);
   }, []);
+
+  useEffect(() => {
+    if (!isMemberDialogOpen) return;
+    const dialog = memberDialogRef.current;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const returnFocus = memberDialogButtonRef.current ?? previousFocus;
+    const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ) ?? []);
+    window.requestAnimationFrame(() => focusable()[0]?.focus());
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setIsMemberDialogOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      returnFocus?.focus();
+    };
+  }, [isMemberDialogOpen]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -472,60 +497,30 @@ export default function DashboardPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className={`flex h-screen w-screen overflow-hidden ${theme === 'dark' ? 'bg-[#09090b] text-[#e4e4e7]' : 'bg-[#f1f5f9] text-[#0f172a]'} transition-colors duration-300`}>
-
-      {/* 1. Space sidebar */}
-      <div className={`flex w-14 sm:w-[72px] shrink-0 flex-col items-center gap-3 border-r py-4 z-50 ${theme === 'dark' ? 'border-white/5 bg-[#0c0c0e]' : 'border-zinc-200 bg-white shadow-xs'}`}>
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-tr from-blue-500 to-indigo-600 text-xl font-bold text-white shadow-lg shadow-blue-500/20 select-none">
-          Ω
-        </div>
-        <div className={`h-[2px] w-8 rounded ${theme === 'dark' ? 'bg-white/10' : 'bg-zinc-200'}`} />
-
-        <div className="flex flex-1 flex-col gap-3 overflow-y-auto w-full items-center no-scrollbar pt-2">
-          {spaces.map((space) => {
-            const isActive = space.id === activeSpaceId;
-            return (
-              <button
-                key={space.id}
-                onClick={() => setActiveSpaceId(space.id)}
-                className={`group relative flex h-12 w-12 items-center justify-center rounded-3xl transition-all duration-200 hover:rounded-2xl active:scale-95 ${theme === 'dark' ? 'bg-zinc-800' : 'bg-zinc-100 border border-zinc-200/50'}`}
-                style={{ borderRadius: isActive ? "16px" : undefined, backgroundColor: isActive ? "#3b82f6" : undefined, color: isActive ? "#fff" : undefined }}
-                title={space.name}
-              >
-                <div className={`absolute left-0 w-1 rounded-r transition-all duration-200 ${theme === 'dark' ? 'bg-white' : 'bg-[#0f172a]'}`}
-                  style={{ height: isActive ? "40px" : "0" }} />
-                {space.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={space.avatarUrl} alt={space.name} className="h-full w-full object-cover" style={{ borderRadius: isActive ? "16px" : "24px" }} />
-                ) : (
-                  <span className={`text-sm font-semibold uppercase tracking-wider ${isActive ? 'text-white' : (theme === 'dark' ? 'text-zinc-400' : 'text-zinc-600')}`}>
-                    {space.name.substring(0, 2)}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-
+    <div className="flex h-screen w-screen overflow-hidden bg-[#09090b] text-[#e4e4e7]">
+      {/* 1. Unified Space and Channel sidebar */}
+      <div className="fixed md:relative left-0 inset-y-0 md:inset-y-auto z-40 md:z-20 flex flex-col overflow-hidden border-r border-white/5 bg-[#111113] transition-all duration-300 shrink-0"
+        style={{ width: isChannelSidebarOpen ? "240px" : "0px", opacity: isChannelSidebarOpen ? 1 : 0 }}>
+        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-white/5 px-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-tr from-blue-500 to-violet-600 text-sm font-bold text-white">Ω</div>
+          <select
+            aria-label="Select space"
+            value={activeSpaceId ?? ""}
+            onChange={(event) => setActiveSpaceId(event.target.value || null)}
+            className="min-w-0 flex-1 truncate rounded-lg border border-white/10 bg-zinc-900 px-2 py-1.5 text-sm font-semibold text-white outline-hidden focus:border-blue-500"
+          >
+            <option value="" disabled>{spaces.length ? "Select a space" : "No spaces yet"}</option>
+            {spaces.map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}
+          </select>
           <button onClick={() => openModal("createSpace")} title="Create Space" aria-label="Create Space"
-            className={`flex h-12 w-12 items-center justify-center rounded-3xl border border-dashed transition-all hover:rounded-2xl ${theme === 'dark' ? 'border-zinc-700 text-zinc-400 hover:border-emerald-500 hover:bg-emerald-600/10 hover:text-emerald-400' : 'border-zinc-300 text-zinc-500 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-600'}`}>
-            <Plus className="h-5 w-5" />
+            className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white">
+            <Plus className="h-4 w-4" />
           </button>
         </div>
-
-        <button onClick={handleLogout}
-          className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${theme === 'dark' ? 'text-zinc-500 hover:bg-red-500/10 hover:text-red-400' : 'text-zinc-400 hover:bg-red-50 hover:text-red-500'}`}
-          title="Log Out">
-          <LogOut className="h-5 w-5" />
-        </button>
-      </div>
-
-      {/* 2. Channel sidebar */}
-      <div className={`fixed md:relative left-14 md:left-auto inset-y-0 md:inset-y-auto z-40 md:z-20 flex flex-col border-r transition-all duration-300 overflow-hidden shrink-0 ${theme === 'dark' ? 'border-white/5 bg-[#111113]' : 'border-zinc-200 bg-[#f8fafc]'}`}
-        style={{ width: isChannelSidebarOpen ? "240px" : "0px", opacity: isChannelSidebarOpen ? 1 : 0 }}>
-        {activeSpace && (
+        {activeSpace ? (
           <>
-            <div className={`flex h-14 shrink-0 items-center justify-between border-b px-4 ${theme === 'dark' ? 'border-white/5' : 'border-zinc-200 bg-white'}`}>
-              <h2 className="truncate text-sm font-bold">{activeSpace.name}</h2>
+            <div className="flex h-11 shrink-0 items-center justify-between border-b border-white/5 px-4">
+              <h2 className="truncate text-xs font-semibold text-zinc-400">Space actions</h2>
               <div className="flex gap-1">
                 <button 
                   onClick={() => {
@@ -621,14 +616,22 @@ export default function DashboardPage() {
                   <span className="truncate text-sm font-semibold">{profile.displayName || profile.username}</span>
                   <span className={`truncate text-xs ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-500'}`}>@{profile.username}</span>
                 </div>
+                <button onClick={handleLogout} className="rounded-lg p-2 text-zinc-500 hover:bg-red-500/10 hover:text-red-400" title="Log Out">
+                  <LogOut className="h-4 w-4" />
+                </button>
               </div>
             )}
           </>
+        ) : (
+          <div className="flex flex-1 flex-col items-center justify-center px-6 text-center text-zinc-500">
+            <Compass className="mb-3 h-9 w-9 stroke-1" />
+            <p className="text-sm">Create or join a Space to begin.</p>
+          </div>
         )}
       </div>
 
-      {/* 3. Main Chat Area */}
-      <div className={`flex flex-1 flex-col min-w-0 ${theme === 'dark' ? 'bg-[#151518]' : 'bg-white'}`}>
+      {/* 2. Main Chat Area */}
+      <div className="flex min-w-0 flex-1 flex-col bg-[#151518]">
         {activeChannel ? (
           <>
             {/* Top Bar */}
@@ -644,14 +647,17 @@ export default function DashboardPage() {
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
-                <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label="Toggle color theme" className={`rounded-full p-2 transition-colors ${theme === 'dark' ? 'hover:bg-white/10 text-yellow-400' : 'hover:bg-zinc-100 text-slate-500'}`}>
-                  {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-                </button>
-                <button onClick={() => setIsMemberSidebarOpen(!isMemberSidebarOpen)} aria-label="Toggle member sidebar" className={`rounded p-1.5 ${theme === 'dark' ? 'hover:bg-white/10 text-zinc-400' : 'hover:bg-zinc-100 text-zinc-500'}`}>
-                  {isMemberSidebarOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRight className="h-5 w-5" />}
-                </button>
-              </div>
+              <button
+                ref={memberDialogButtonRef}
+                onClick={() => setIsMemberDialogOpen(true)}
+                aria-label="View members"
+                aria-haspopup="dialog"
+                aria-expanded={isMemberDialogOpen}
+                className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <Users className="h-5 w-5" />
+                <span className="text-xs font-semibold">{members.length}</span>
+              </button>
             </div>
 
             <VoiceGrid />
@@ -823,42 +829,52 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* 4. Members sidebar */}
-      <div className={`fixed lg:relative right-0 inset-y-0 lg:inset-y-auto z-40 lg:z-20 flex flex-col border-l transition-all duration-300 overflow-hidden shrink-0 ${theme === 'dark' ? 'border-white/5 bg-[#111113]' : 'border-zinc-200 bg-[#f8fafc]'}`}
-        style={{ width: isMemberSidebarOpen ? "220px" : "0px", opacity: isMemberSidebarOpen ? 1 : 0 }}>
-        {activeSpace && (
-          <>
-            <div className={`flex h-14 shrink-0 items-center gap-2 border-b px-4 ${theme === 'dark' ? 'border-white/5 bg-[#111113]' : 'border-zinc-200 bg-white'}`}>
+      {/* Member directory overlay: never consumes a permanent layout column. */}
+      {isMemberDialogOpen && activeSpace && (
+        <div
+          className="fixed inset-0 z-[70] flex justify-end bg-black/60 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsMemberDialogOpen(false);
+          }}
+        >
+          <div
+            ref={memberDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="members-dialog-title"
+            className="flex h-full w-full max-w-sm flex-col border-l border-white/10 bg-[#111113] shadow-2xl"
+          >
+            <div className="flex h-14 shrink-0 items-center gap-2 border-b border-white/5 px-4">
               <Users className="h-4 w-4 text-zinc-500" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-500">Members — {members.length}</h2>
+              <h2 id="members-dialog-title" className="flex-1 text-sm font-bold">Members</h2>
+              <span className="text-xs text-zinc-500">{members.length}</span>
+              <button autoFocus onClick={() => setIsMemberDialogOpen(false)} aria-label="Close members" className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
             </div>
-
-            <div className="flex-1 overflow-y-auto px-2 py-4 space-y-1 no-scrollbar">
+            <div className="flex-1 space-y-1 overflow-y-auto p-3">
               {members.map((member) => {
                 const isOnline = !!presenceUsers[member.profileId];
                 const isMe = member.profileId === profile?.id;
                 return (
-                  <div key={member.id} onClick={() => { if (!isMe && isAdminOrOwner) { setSelectedMember(member); openModal("memberActions"); } }}
-                    className={`flex items-center gap-3 rounded-lg px-2.5 py-2 cursor-pointer transition-colors ${theme === 'dark' ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
-                    <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                  <button key={member.id} disabled={isMe || !isAdminOrOwner}
+                    onClick={() => { setIsMemberDialogOpen(false); setSelectedMember(member); openModal("memberActions"); }}
+                    className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors enabled:hover:bg-white/5 disabled:cursor-default">
+                    <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-800">
                       {member.profile?.avatarUrl ? <img src={member.profile.avatarUrl} alt="" className="h-full w-full object-cover" /> : <span className="text-[10px] font-bold uppercase">{member.profile?.username.substring(0,2)}</span>}
-                      <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 ${theme === 'dark' ? 'border-[#111113]' : 'border-[#f8fafc]'}`} style={{ backgroundColor: isOnline ? "#10b981" : "#94a3b8" }} />
+                      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#111113]" style={{ backgroundColor: isOnline ? "#10b981" : "#64748b" }} />
                     </div>
-                    <div className="flex flex-1 flex-col overflow-hidden">
-                      <div className="flex items-center gap-1.5">
-                        {member.role === "OWNER" && <Crown className="h-3 w-3 text-yellow-500 shrink-0" />}
-                        {member.role === "ADMIN" && <Shield className="h-3 w-3 text-blue-500 shrink-0" />}
-                        <span className="truncate text-sm font-semibold">{member.profile?.displayName || member.profile?.username}</span>
-                      </div>
-                      {isMe && <span className="text-[10px] font-medium text-zinc-400">You</span>}
-                    </div>
-                  </div>
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold">{member.profile?.displayName || member.profile?.username}</span>
+                    {member.role === "OWNER" && <Crown className="h-3.5 w-3.5 text-yellow-500" />}
+                    {member.role === "ADMIN" && <Shield className="h-3.5 w-3.5 text-blue-500" />}
+                    {isMe && <span className="text-[10px] text-zinc-500">You</span>}
+                  </button>
                 );
               })}
             </div>
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Context Menu ────────────────────────────────────────────── */}
       {contextMenu && (

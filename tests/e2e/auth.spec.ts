@@ -14,6 +14,21 @@ test("a new user signs up, receives a safe session, and can log back in", async 
 
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("button", { name: "Create Space" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Select space" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Toggle color theme" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Create Space" }).click();
+  await page.getByPlaceholder("Space Name").fill("Baseline Space");
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Select space" })).toHaveValue(/.+/);
+
+  const membersButton = page.getByRole("button", { name: "View members" });
+  await membersButton.click();
+  const membersDialog = page.getByRole("dialog", { name: "Members" });
+  await expect(membersDialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(membersDialog).toBeHidden();
+  await expect(membersButton).toBeFocused();
 
   const sessionResponse = await page.request.get("/api/auth/me");
   expect(sessionResponse.status()).toBe(200);
