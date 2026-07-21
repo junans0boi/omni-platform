@@ -51,9 +51,13 @@ if (behaviorFiles.length > 0 && runnableTestChanges.length === 0) {
   );
 }
 
-if (supabaseFiles.length > 0) {
+const supabaseTestChanges = changes.filter(
+  ({ status, file }) => status !== "D" && /^tests\/supabase\/.*\.test\.[cm]?[jt]sx?$/.test(file),
+);
+
+if (supabaseFiles.length > 0 && supabaseTestChanges.length === 0) {
   throw new Error(
-    `Supabase migrations are blocked until the executable local Supabase test lane is installed (#56):\n${supabaseFiles.map((file) => `- ${file}`).join("\n")}`,
+    `Supabase migrations require an executable SQL contract test change:\n${supabaseFiles.map((file) => `- ${file}`).join("\n")}`,
   );
 }
 
