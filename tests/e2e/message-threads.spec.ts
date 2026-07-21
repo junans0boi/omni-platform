@@ -85,17 +85,17 @@ test("two members reply and maintain a private thread across update, reconnect, 
   // After the inline reply, the rootRow filter also matches the inline reply row (which
   // quotes "durable thread root"), so scope the button click to the first matched row.
   await rootRowB.first().getByRole("button", { name: "Open thread" }).click();
-  const panelB = pageB.getByRole("dialog", { name: "Thread" });
-  await panelB.getByLabel("Reply to thread").fill("first panel reply");
-  await panelB.getByRole("button", { name: "Send thread reply" }).click();
+  const panelB = pageB.getByRole("dialog", { name: /Thread|스레드/ });
+  await panelB.getByLabel(/Reply to thread|스레드에 답글 달기/).fill("first panel reply");
+  await panelB.getByRole("button", { name: /Send thread reply|답글 전송/ }).click();
   await expect(panelB.getByTestId("thread-reply")).toContainText("first panel reply");
   await expect(pageB.getByTestId("message-row").filter({ hasText: "first panel reply" })).toHaveCount(0);
 
   await rootRowA.first().getByRole("button", { name: "Open thread" }).click();
-  const panelA = pageA.getByRole("dialog", { name: "Thread" });
+  const panelA = pageA.getByRole("dialog", { name: /Thread|스레드/ });
   await expect(panelA).toContainText("first panel reply");
 
-  await panelB.getByRole("button", { name: "Edit thread reply" }).click();
+  await panelB.getByRole("button", { name: /Edit thread reply|답글 수정/ }).click();
   await panelB.getByLabel("Edit thread reply content").fill("edited panel reply");
   await panelB.getByLabel("Edit thread reply content").press("Enter");
   await expect(panelA).toContainText("edited panel reply");
@@ -109,10 +109,10 @@ test("two members reply and maintain a private thread across update, reconnect, 
   const reconnectedRoot = pageA.getByTestId("message-row").filter({ hasText: "durable thread root" });
   await expect(reconnectedRoot.first()).toBeVisible({ timeout: 15_000 });
   await reconnectedRoot.first().getByRole("button", { name: "Open thread" }).click();
-  await expect(pageA.getByRole("dialog", { name: "Thread" })).toContainText("edited panel reply");
+  await expect(pageA.getByRole("dialog", { name: /Thread|스레드/ })).toContainText("edited panel reply");
 
-  await panelB.getByRole("button", { name: "Delete thread reply" }).click();
-  await expect(pageA.getByRole("dialog", { name: "Thread" })).toContainText("[deleted message]");
+  await panelB.getByRole("button", { name: /Delete thread reply|답글 삭제/ }).click();
+  await expect(pageA.getByRole("dialog", { name: /Thread|스레드/ })).toContainText("[deleted message]");
 
   await contextA.close();
   await contextB.close();

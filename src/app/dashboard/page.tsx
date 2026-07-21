@@ -658,18 +658,18 @@ export default function DashboardPage() {
                     setCopiedInvite(true);
                     setTimeout(() => setCopiedInvite(false), 2000);
                   }}
-                  title="Copy Invite Code"
+                  title={t("dashboard.copyInvite")}
                   className={`rounded p-1.5 transition-colors ${copiedInvite ? 'text-emerald-500' : (theme === 'dark' ? 'text-zinc-400 hover:bg-white/10 hover:text-white' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900')}`}
                 >
                   {copiedInvite ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 </button>
                 {isAdminOrOwner && (
-                  <button onClick={() => openModal("createChannel")} title="Create Channel" className={`rounded p-1.5 transition-colors ${theme === 'dark' ? 'text-zinc-400 hover:bg-white/10 hover:text-white' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'}`}><Plus className="h-4 w-4" /></button>
+                  <button onClick={() => openModal("createChannel")} title={t("dialog.createChannel")} className={`rounded p-1.5 transition-colors ${theme === 'dark' ? 'text-zinc-400 hover:bg-white/10 hover:text-white' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'}`}><Plus className="h-4 w-4" /></button>
                 )}
                 {myMember?.role === "OWNER" ? (
-                  <button onClick={handleDeleteSpace} title="Delete Space" className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                  <button onClick={handleDeleteSpace} title={t("dashboard.deleteSpace")} className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
                 ) : myMember ? (
-                  <button onClick={handleLeaveSpace} title="Leave Space" className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-500"><LogOut className="h-4 w-4" /></button>
+                  <button onClick={handleLeaveSpace} title={t("dashboard.leaveSpace")} className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-500"><LogOut className="h-4 w-4" /></button>
                 ) : null}
               </div>
             </div>
@@ -746,7 +746,7 @@ export default function DashboardPage() {
                   <span className="truncate text-sm font-semibold">{profile.displayName || profile.username}</span>
                   <span className={`truncate text-xs ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-500'}`}>@{profile.username}</span>
                 </div>
-                <button onClick={handleLogout} className="rounded-lg p-2 text-zinc-500 hover:bg-red-500/10 hover:text-red-400" title="Log Out">
+                <button onClick={handleLogout} className="rounded-lg p-2 text-zinc-500 hover:bg-red-500/10 hover:text-red-400" title={t("profile.logout")}>
                   <LogOut className="h-4 w-4" />
                 </button>
               </div>
@@ -1222,27 +1222,27 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="mb-2 block text-xs font-bold text-zinc-500">DISPLAY NAME</label>
+                  <label className="mb-2 block text-xs font-bold text-zinc-500">{t("profile.displayName")}</label>
                   <input autoFocus value={editDisplayName} onChange={(e) => setEditDisplayName(e.target.value)} placeholder={profile?.username} className={`w-full rounded-xl px-4 py-3 outline-hidden border ${theme === 'dark' ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-200'}`} />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="text-xs font-bold text-zinc-500">AVAILABILITY
+                  <label className="text-xs font-bold text-zinc-500">{t("profile.availability")}
                     <select aria-label="AVAILABILITY" value={editAvailability} onChange={(event) => setEditAvailability(event.target.value as typeof editAvailability)}
                       className="mt-2 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-white">
-                      <option value="AVAILABLE">Available</option>
-                      <option value="IDLE">Idle</option>
-                      <option value="DND">Do not disturb</option>
+                      <option value="AVAILABLE">{t("profile.availability.available")}</option>
+                      <option value="IDLE">{t("profile.availability.idle")}</option>
+                      <option value="DND">{t("profile.availability.dnd")}</option>
                     </select>
                   </label>
-                  <label className="text-xs font-bold text-zinc-500">CUSTOM STATUS
+                  <label className="text-xs font-bold text-zinc-500">{t("profile.customStatus")}
                     <input aria-label="CUSTOM STATUS" value={editCustomStatus} maxLength={128} onChange={(event) => setEditCustomStatus(event.target.value)}
                       className="mt-2 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-white" />
                   </label>
                 </div>
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={closeModal} className={`flex-1 rounded-xl py-3 font-bold transition-colors ${theme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-slate-100 hover:bg-slate-200'}`}>Cancel</button>
-                  <button type="submit" disabled={formLoading} className="flex-1 rounded-xl bg-blue-600 py-3 font-bold text-white transition-colors hover:bg-blue-500 disabled:opacity-50">Save</button>
+                  <button type="button" onClick={closeModal} className={`flex-1 rounded-xl py-3 font-bold transition-colors ${theme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-slate-100 hover:bg-slate-200'}`}>{t("common.cancel")}</button>
+                  <button type="submit" disabled={formLoading} className="flex-1 rounded-xl bg-blue-600 py-3 font-bold text-white transition-colors hover:bg-blue-500 disabled:opacity-50">{t("common.save")}</button>
                 </div>
               </form>
             )}

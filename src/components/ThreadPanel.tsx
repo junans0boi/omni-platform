@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Edit2, Send, Trash2, X } from "lucide-react";
 import type { Message } from "@/store/useAppStore";
 import { DELETED_MESSAGE_PREVIEW } from "@/lib/message-threads";
+import { useI18n } from "@/i18n/I18nProvider";
 
 type ThreadPayload = { root: Message; replies: Message[] };
 
@@ -22,6 +23,7 @@ export function ThreadPanel({
   currentProfileId: string;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const panelRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const [thread, setThread] = useState<ThreadPayload | null>(null);
@@ -135,13 +137,13 @@ export function ThreadPanel({
         className="flex h-full w-full max-w-md flex-col border-l border-white/10 bg-[#111113] shadow-2xl"
       >
         <header className="flex h-14 items-center border-b border-white/10 px-4">
-          <h2 id="thread-panel-title" className="flex-1 font-bold">Thread</h2>
-          <button ref={closeRef} type="button" onClick={onClose} aria-label="Close thread" className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white">
+          <h2 id="thread-panel-title" className="flex-1 font-bold">{t("thread.title")}</h2>
+          <button ref={closeRef} type="button" onClick={onClose} aria-label={t("common.close")} className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white">
             <X className="h-4 w-4" />
           </button>
         </header>
         <div className="flex-1 overflow-y-auto p-4" aria-live="polite">
-          {!thread ? <p className="text-sm text-zinc-500">Loading thread…</p> : (
+          {!thread ? <p className="text-sm text-zinc-500">{t("common.loading")}</p> : (
             <>
               <article className="mb-4 border-b border-white/10 pb-4" data-testid="thread-root">
                 <p className="text-sm font-bold">{thread.root.profile?.displayName || thread.root.profile?.username}</p>
@@ -156,8 +158,8 @@ export function ThreadPanel({
                       <time className="text-[10px] text-zinc-500">{new Date(reply.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
                       {!reply.deletedAt && reply.profileId === currentProfileId && (
                         <span className="ml-auto flex gap-1">
-                          <button type="button" aria-label="Edit thread reply" onClick={() => { setEditingId(reply.id); setEditingContent(reply.content); }} className="rounded p-1 text-zinc-400 hover:bg-white/10"><Edit2 className="h-3.5 w-3.5" /></button>
-                          <button type="button" aria-label="Delete thread reply" onClick={() => void remove(reply.id)} className="rounded p-1 text-red-400 hover:bg-red-500/10"><Trash2 className="h-3.5 w-3.5" /></button>
+                          <button type="button" aria-label={t("thread.editReply")} onClick={() => { setEditingId(reply.id); setEditingContent(reply.content); }} className="rounded p-1 text-zinc-400 hover:bg-white/10"><Edit2 className="h-3.5 w-3.5" /></button>
+                          <button type="button" aria-label={t("thread.deleteReply")} onClick={() => void remove(reply.id)} className="rounded p-1 text-red-400 hover:bg-red-500/10"><Trash2 className="h-3.5 w-3.5" /></button>
                         </span>
                       )}
                     </div>
@@ -176,8 +178,8 @@ export function ThreadPanel({
         <form onSubmit={send} className="border-t border-white/10 p-4">
           {error && <p role="alert" className="mb-2 text-xs text-red-400">{error}</p>}
           <div className="flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-3">
-            <input aria-label="Reply to thread" value={content} onChange={(event) => setContent(event.target.value)} placeholder="Reply to thread" className="min-w-0 flex-1 bg-transparent py-3 text-sm outline-hidden" />
-            <button type="submit" aria-label="Send thread reply" disabled={!content.trim() || sending} className="rounded-lg bg-blue-600 p-2 text-white disabled:opacity-40"><Send className="h-4 w-4" /></button>
+            <input aria-label={t("thread.replyPlaceholder")} value={content} onChange={(event) => setContent(event.target.value)} placeholder={t("thread.replyPlaceholder")} className="min-w-0 flex-1 bg-transparent py-3 text-sm outline-hidden" />
+            <button type="submit" aria-label={t("thread.sendReply")} disabled={!content.trim() || sending} className="rounded-lg bg-blue-600 p-2 text-white disabled:opacity-40"><Send className="h-4 w-4" /></button>
           </div>
         </form>
       </aside>
