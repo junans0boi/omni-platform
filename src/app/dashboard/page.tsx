@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore, Member, Reaction } from "@/store/useAppStore";
+import { useShallow } from "zustand/react/shallow";
 import { useRealtime } from "@/hooks/useRealtime";
 import { getErrorMessage } from "@/lib/errors";
 import {
@@ -13,6 +14,7 @@ import {
 import VoiceGrid from "@/components/VoiceGrid";
 import { LocaleSettings } from "@/components/LocaleSettings";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useBoundedVirtualList } from "@/hooks/useBoundedVirtualList";
 
 type ModalType =
   | "createSpace"
@@ -37,7 +39,38 @@ export default function DashboardPage() {
     setTheme, setProfile, fetchSpaces, fetchSpaceData, fetchMessages,
     createSpace, joinSpace, deleteSpace, sendMessage, editMessage, deleteMessage, toggleReaction,
     setActiveSpaceId, setActiveChannelId, joinVoiceChannel, activeVoiceChannelId,
-  } = useAppStore();
+  } = useAppStore(useShallow((state) => ({
+    profile: state.profile,
+    spaces: state.spaces,
+    categories: state.categories,
+    channels: state.channels,
+    members: state.members,
+    messages: state.messages,
+    messageHistoryCursor: state.messageHistoryCursor,
+    isLoadingOlderMessages: state.isLoadingOlderMessages,
+    loadOlderMessages: state.loadOlderMessages,
+    activeSpaceId: state.activeSpaceId,
+    activeChannelId: state.activeChannelId,
+    presenceUsers: state.presenceUsers,
+    theme: state.theme,
+    unreadBadges: state.unreadBadges,
+    setTheme: state.setTheme,
+    setProfile: state.setProfile,
+    fetchSpaces: state.fetchSpaces,
+    fetchSpaceData: state.fetchSpaceData,
+    fetchMessages: state.fetchMessages,
+    createSpace: state.createSpace,
+    joinSpace: state.joinSpace,
+    deleteSpace: state.deleteSpace,
+    sendMessage: state.sendMessage,
+    editMessage: state.editMessage,
+    deleteMessage: state.deleteMessage,
+    toggleReaction: state.toggleReaction,
+    setActiveSpaceId: state.setActiveSpaceId,
+    setActiveChannelId: state.setActiveChannelId,
+    joinVoiceChannel: state.joinVoiceChannel,
+    activeVoiceChannelId: state.activeVoiceChannelId,
+  })));
 
   useRealtime();
 
@@ -56,11 +89,13 @@ export default function DashboardPage() {
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const previousFirstMessageRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const memberDialogRef = useRef<HTMLDivElement>(null);
   const memberDialogButtonRef = useRef<HTMLButtonElement>(null);
+  const { scrollRef: messageScrollRef, virtualizer: messageVirtualizer } =
+    useBoundedVirtualList(messages);
 
   // ── Form state ────────────────────────────────────────────────────────────
   const [newSpaceName, setNewSpaceName] = useState("");
@@ -174,8 +209,28 @@ export default function DashboardPage() {
   }, [activeChannelId, fetchMessages]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (!messages.length) {
+      previousFirstMessageRef.current = null;
+      return;
+    }
+    const previousFirst = previousFirstMessageRef.current;
+    const previousIndex = previousFirst
+      ? messages.findIndex((message) => message.id === previousFirst)
+      : -1;
+
+    if (previousIndex > 0) {
+      // Loading an older cursor page must keep the former first row anchored.
+      messageVirtualizer.scrollToIndex(previousIndex, { align: "start" });
+    } else {
+      const viewport = messageScrollRef.current;
+      const nearBottom = !viewport ||
+        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 160;
+      if (!previousFirst || nearBottom) {
+        messageVirtualizer.scrollToIndex(messages.length - 1, { align: "end" });
+      }
+    }
+    previousFirstMessageRef.current = messages[0].id;
+  }, [messageScrollRef, messageVirtualizer, messages]);
 
   useEffect(() => {
     const close = () => setContextMenu(null);
@@ -667,7 +722,11 @@ export default function DashboardPage() {
             <VoiceGrid />
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-1 no-scrollbar">
+            <div
+              ref={messageScrollRef}
+              data-testid="message-viewport"
+              className="flex-1 overflow-y-auto p-4 sm:p-6 no-scrollbar"
+            >
               {messageHistoryCursor && (
                 <div className="flex justify-center pb-3">
                   <button
@@ -680,7 +739,13 @@ export default function DashboardPage() {
                   </button>
                 </div>
               )}
-              {messages.map((msg, idx) => {
+              <div
+                data-testid="message-virtual-space"
+                style={{ height: `${messageVirtualizer.getTotalSize()}px`, position: "relative" }}
+              >
+              {messageVirtualizer.getVirtualItems().map((virtualRow) => {
+                const idx = virtualRow.index;
+                const msg = messages[idx];
                 const prevMsg = messages[idx - 1];
                 const isConsecutive = prevMsg && prevMsg.profileId === msg.profileId && (new Date(msg.createdAt).getTime() - new Date(prevMsg.createdAt).getTime() < 300000);
                 const isMe = msg.profileId === profile?.id;
@@ -690,7 +755,16 @@ export default function DashboardPage() {
 
                 return (
                   <div key={msg.id}
-                    style={{ contentVisibility: "auto", containIntrinsicSize: "0 72px" }}
+                    ref={messageVirtualizer.measureElement}
+                    data-index={virtualRow.index}
+                    data-testid="message-row"
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
                     className={`group relative flex gap-3 px-2 py-1 -mx-2 rounded-lg transition-colors ${isMentioned ? (theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50') : (theme === 'dark' ? 'hover:bg-white/5' : 'hover:bg-slate-50')} ${!isConsecutive ? 'mt-4' : ''}`}>
                     
                     {/* Avatar or Timestamp */}
@@ -775,7 +849,7 @@ export default function DashboardPage() {
                   </div>
                 );
               })}
-              <div ref={messagesEndRef} />
+              </div>
             </div>
 
             {/* Input Area */}

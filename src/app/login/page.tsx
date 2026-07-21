@@ -104,6 +104,11 @@ export default function LoginPage() {
             {t("auth.signup.submit")}
           </Link>
         </p>
+        <p className="mt-3 text-center text-sm">
+          <Link href="/claim" className="text-indigo-400 hover:text-indigo-300">
+            Claim or reset an existing account
+          </Link>
+        </p>
       </div>
     </div>
   );

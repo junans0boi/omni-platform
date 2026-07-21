@@ -42,11 +42,13 @@ export default function SignupPage() {
 
       const data = await res.json();
 
-      if (res.ok) {
+      if (res.ok && data.verificationRequired) {
         setSuccess(true);
         setLoading(false);
-        router.push("/dashboard");
-        router.refresh();
+      } else if (res.ok) {
+        setSuccess(true);
+        setLoading(false);
+        router.replace("/dashboard");
       } else {
         setError(data.code ? t("auth.signup.failed") : (data.error || t("auth.signup.failed")));
         setLoading(false);

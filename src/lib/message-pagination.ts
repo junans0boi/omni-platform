@@ -3,7 +3,7 @@ export interface MessageCursor {
   createdAt: string;
 }
 
-export interface PageMessage extends MessageCursor {}
+export type PageMessage = MessageCursor;
 
 export const DEFAULT_MESSAGE_PAGE_SIZE = 50;
 export const MAX_MESSAGE_PAGE_SIZE = 100;

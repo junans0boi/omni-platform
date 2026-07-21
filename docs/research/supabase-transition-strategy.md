@@ -119,9 +119,9 @@ from the supported import mechanisms and the repository constraints.
 2. Rehearse trigger success, duplicate username, missing metadata, rollback-on-error, and
    Auth-user deletion behavior. A broken trigger can block signup, so trigger errors are a
    hard stop.
-3. Provision legacy users server-side with their existing UUID where account prerequisites
-   are met; first prove against the exact staging Auth version that explicit UUID creation is
-   supported, and abort on collision. Preserve profile data without publishing credentials.
+3. Provision legacy users server-side and use ADR 0003's trusted `auth_user_id` link while
+   preserving the Profile UUID and domain FKs. Abort on any target/link collision and never
+   publish credentials.
 4. For profiles without a verified unique email or portable password, retain their business
    rows but mark account activation pending. Complete a claim/reset flow before allowing login.
 5. Invalidate all Prisma `Session` rows/cookies at cutover. Do not attempt to translate them

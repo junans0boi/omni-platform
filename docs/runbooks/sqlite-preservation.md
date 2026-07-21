@@ -43,6 +43,7 @@ is audit evidence only: SQLite and Postgres necessarily have different physical 
 - `prisma/dev.db`, its backups, and `prisma/migrations/**` remain unchanged.
 - This slice deliberately excludes `Session` and Profile password fields from import payloads; the
   manifest only counts/hashes records. Supabase Auth claim/reset belongs to #56.
-- The concrete PostgreSQL target adapter is gated on the lossless DDL (#55) and Auth UUID
-  provisioning (#56). It consumes private batches in memory and emits this comparator contract.
+- The concrete PostgreSQL target adapter is gated on the lossless DDL (#55) and trusted
+  Auth-ID/Profile-ID linking (#56). It consumes private batches in memory and emits this
+  comparator contract.
 - Manifest files and database snapshots are operational artifacts and must never be committed.

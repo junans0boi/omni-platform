@@ -47,7 +47,7 @@ current file would lose data.
 
 | Source | Target | Contract |
 | --- | --- | --- |
-| `Profile` | `auth.users` + `profiles` | Preserve `id` as the Auth/profile UUID after a staging explicit-ID test; preserve username/display/avatar. Auth owns email and credentials. |
+| `Profile` | `auth.users` + `profiles` | Preserve the domain `id`; link the Auth-owned UUID through `auth_user_id` as decided by ADR 0003. Preserve username/display/avatar. Auth owns email and credentials. |
 | `Session` | Supabase Auth session | Do not import; invalidate at cutover and require reauthentication. |
 | `Space` | `spaces` | Preserve ID, owner, invite code, timestamps, and `archived_at`. |
 | `Category` | `categories` | Preserve ID, Space FK, position, and timestamp. |
@@ -56,9 +56,9 @@ current file would lose data.
 | `Message` | `messages` | Preserve content, IDs/FKs, `created_at`, and the currently omitted `edited_at`. |
 | `Reaction` | `reactions` | Add the omitted target table and preserve its unique message/profile/emoji tuple. |
 
-If the target Auth version cannot create an existing UUID, stop. A reviewed crosswalk and a
-transactional rewrite of every Profile FK requires a replacement ADR; it is not an automatic
-fallback. Profiles without a unique user-controlled email remain preserved but cannot pass
+The target Auth SDK cannot create a caller-selected UUID, so ADR 0003 keeps the domain UUID
+and links the generated Auth UUID through `profiles.auth_user_id`; no Profile or domain FK is
+rewritten. Profiles without a unique user-controlled email remain preserved but cannot pass
 the activation/cutover gate until a secure claim flow supplies and verifies one. Do not
 invent routable or placeholder identities.
 
@@ -79,7 +79,7 @@ synthetic parity tests. Supabase SQL is the only target schema authority.
 
 ### 2. #3-compatible Auth and profile transition
 
-Prove explicit legacy UUID provisioning on the exact target Auth version. Implement a
+Apply ADR 0003's trusted Auth-to-legacy-Profile link on the exact target Auth version. Implement a
 minimal, fixed-search-path profile trigger, a legacy account claim/reset flow, username and
 email collision handling, and local-session invalidation. Import identities and then the
 domain graph in FK order. The trigger and existing application signup must never both create
@@ -138,6 +138,10 @@ Remove SSE only after two-user delivery, non-member denial, reconnect/JWT-refres
 and multi-instance tests pass.
 
 ## Prisma/Supabase boundary
+
+`OMNI_PLATFORM_BACKEND=legacy|supabase` is the single deployment authority gate. There is
+no independent Auth switch: #60 changes Auth, reads, and writes together after rehearsal so
+the application cannot enter a mixed-writer state.
 
 | Phase | Prisma/SQLite | Supabase |
 | --- | --- | --- |

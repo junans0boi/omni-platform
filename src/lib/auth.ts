@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { hashSessionToken, SESSION_COOKIE_NAME } from "@/lib/session";
+import { getAuthBackend } from "@/lib/auth-backend";
+import { getSupabaseSessionProfile } from "@/lib/supabase-auth";
 
 export const safeProfileSelect = {
   id: true,
@@ -12,6 +14,10 @@ export const safeProfileSelect = {
 } as const;
 
 export async function getSessionUser() {
+  if (getAuthBackend() === "supabase") {
+    return getSupabaseSessionProfile();
+  }
+
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   if (!token) return null;

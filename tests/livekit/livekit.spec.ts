@@ -127,6 +127,20 @@ test("two users exchange media and Stage audience remains subscribe-only", async
     await expect(ownerRemote).toHaveAttribute("data-livekit-video-source", "camera", {
       timeout: 20_000,
     });
+    await memberPage.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    const memberGrid = memberPage.locator('[data-livekit-video-rendering]');
+    await expect(memberGrid).toHaveAttribute("data-livekit-video-rendering", "paused");
+    await expect(ownerRemote).toHaveAttribute("data-livekit-audio-subscribed", "true");
+    await expect(ownerRemote.locator("video")).toHaveCount(0);
+    await memberPage.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await expect(memberGrid).toHaveAttribute("data-livekit-video-rendering", "active");
+    await expect(ownerRemote.locator("video")).toHaveCount(1);
     await ownerPage.getByTitle("Camera Off").click();
     await expect(ownerRemote).toHaveAttribute("data-livekit-video-source", "none", {
       timeout: 20_000,

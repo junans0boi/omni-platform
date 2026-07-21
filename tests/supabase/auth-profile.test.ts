@@ -18,8 +18,10 @@ describe("Supabase Auth and Profile claim contract", () => {
     expect(sql).toContain("for each row execute function public.handle_new_user()");
   });
 
-  it("claims an existing Profile only by its exact UUID and rejects collisions", () => {
-    expect(sql).toContain("where p.id = new.id");
+  it("links only the exact trusted legacy Profile and rejects collisions", () => {
+    expect(sql).toContain("new.raw_app_meta_data ->> 'legacy_profile_id'");
+    expect(sql).toContain("where p.id = coalesce(requested_profile_id, new.id)");
+    expect(sql).toContain("where p.id = existing_profile.id");
     expect(sql).toContain("profile_uuid_already_claimed");
     expect(sql).toContain("profile_username_collision");
     expect(sql).toContain("legacy_claim_username_mismatch");

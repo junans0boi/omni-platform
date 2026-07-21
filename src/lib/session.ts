@@ -1,6 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { getAuthBackend } from "@/lib/auth-backend";
+import { createSupabaseAuthClient } from "@/lib/supabase-auth";
 
 export const SESSION_COOKIE_NAME = "session_token";
 export const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 7;
@@ -33,6 +35,15 @@ export async function createSession(profileId: string) {
 }
 
 export async function deleteCurrentSession() {
+  if (getAuthBackend() === "supabase") {
+    const supabase = await createSupabaseAuthClient();
+    await supabase.auth.signOut();
+    const cookieStore = await cookies();
+    cookieStore.delete(SESSION_COOKIE_NAME);
+    cookieStore.delete("session_user_id");
+    return;
+  }
+
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 

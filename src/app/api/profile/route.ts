@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser, safeProfileSelect } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getAuthBackend } from "@/lib/auth-backend";
+import { updateSupabaseSessionProfile } from "@/lib/supabase-auth";
 
 // GET /api/profile — Get current user's profile
 export async function GET() {
@@ -20,6 +22,21 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const { displayName, avatarUrl } = await req.json();
+
+    if (getAuthBackend() === "supabase") {
+      const updated = await updateSupabaseSessionProfile({
+        ...(displayName !== undefined && {
+          displayName: typeof displayName === "string" ? displayName.trim() || null : null,
+        }),
+        ...(avatarUrl !== undefined && {
+          avatarUrl: typeof avatarUrl === "string" ? avatarUrl || null : null,
+        }),
+      });
+      if (!updated) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      return NextResponse.json(updated);
+    }
 
     const updated = await prisma.profile.update({
       where: { id: user.id },

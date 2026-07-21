@@ -15,7 +15,8 @@ rollback source until an explicit decommission decision.
   staged claim/reset path and Supabase sessions.
 - A Profile UUID is a durable domain identifier, not the lifecycle owner of an Auth user.
   The nullable Auth link uses `ON DELETE SET NULL`; deleting an Auth user must not cascade
-  through the retained domain graph. Account-exit behavior is defined by ADR 0002.
+  through the retained domain graph. ADR 0003 defines legacy Auth linking, and account-exit
+  behavior is defined by ADR 0002.
 - Before Supabase accepts writes, rollback is an application switch to unchanged SQLite.
   Afterwards, database rollback requires a frozen, tested reverse reconciliation or a
   Supabase recovery/forward-fix; a blind switch would lose accepted writes.

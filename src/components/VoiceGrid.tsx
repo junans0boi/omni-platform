@@ -9,7 +9,9 @@ import {
   RemoteParticipant,
 } from "livekit-client";
 import { useAppStore } from "@/store/useAppStore";
+import { useShallow } from "zustand/react/shallow";
 import { getSoundEffects } from "@/lib/browser-sound-effects";
+import { currentDocumentVisibility, shouldRenderVideo } from "@/lib/media-visibility";
 import { Mic, MicOff, Video, VideoOff, Monitor, PhoneOff, ChevronUp, ChevronDown } from "lucide-react";
 
 export default function VoiceGrid() {
@@ -23,7 +25,17 @@ export default function VoiceGrid() {
     toggleMute,
     toggleCamera,
     toggleScreenShare,
-  } = useAppStore();
+  } = useAppStore(useShallow((state) => ({
+    livekitToken: state.livekitToken,
+    activeVoiceChannelId: state.activeVoiceChannelId,
+    isMuted: state.isMuted,
+    isCameraOn: state.isCameraOn,
+    isScreenSharing: state.isScreenSharing,
+    leaveVoiceChannel: state.leaveVoiceChannel,
+    toggleMute: state.toggleMute,
+    toggleCamera: state.toggleCamera,
+    toggleScreenShare: state.toggleScreenShare,
+  })));
 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
@@ -38,12 +50,21 @@ export default function VoiceGrid() {
     hasScreenShare: false,
   });
   const [audioBlocked, setAudioBlocked] = useState(false);
+  const [documentVisibility, setDocumentVisibility] =
+    useState<DocumentVisibilityState>(currentDocumentVisibility);
   const roomRef = useRef<Room | null>(null);
   const muteInitializedRef = useRef(false);
   const localVideoRef = useRef<HTMLDivElement>(null);
   const remoteVideoRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const canPublish = getCanPublish(livekitToken);
   const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "";
+  const renderVideo = shouldRenderVideo(isCollapsed, documentVisibility);
+
+  useEffect(() => {
+    const syncVisibility = () => setDocumentVisibility(document.visibilityState);
+    document.addEventListener("visibilitychange", syncVisibility);
+    return () => document.removeEventListener("visibilitychange", syncVisibility);
+  }, []);
 
   // ── Connect / Disconnect ──────────────────────────────────────────────────
   useEffect(() => {
@@ -171,7 +192,7 @@ export default function VoiceGrid() {
   useEffect(() => {
     const room = roomRef.current;
     const container = localVideoRef.current;
-    if (!room || !container || isCollapsed) return;
+    if (!room || !container || !renderVideo) return;
 
     const videoPublications = Array.from(
       room.localParticipant.trackPublications.values()
@@ -201,7 +222,7 @@ export default function VoiceGrid() {
         element.remove();
       });
     };
-  }, [activeVoiceChannelId, isCollapsed, livekitToken, localMedia.revision]);
+  }, [activeVoiceChannelId, livekitToken, localMedia.revision, renderVideo]);
 
   // Keep remote audio attached even while the visual grid is collapsed.
   useEffect(() => {
@@ -233,7 +254,7 @@ export default function VoiceGrid() {
 
   // Prefer screen share over camera so the emphasized tile cannot be obscured.
   useEffect(() => {
-    if (isCollapsed) return;
+    if (!renderVideo) return;
 
     const attachedMedia = remoteParticipants.flatMap((participant) => {
       const container = remoteVideoRefs.current[participant.sid];
@@ -268,7 +289,7 @@ export default function VoiceGrid() {
         element.remove();
       });
     };
-  }, [isCollapsed, remoteParticipants]);
+  }, [remoteParticipants, renderVideo]);
 
   if (!activeVoiceChannelId || !livekitToken) return null;
 
@@ -288,7 +309,10 @@ export default function VoiceGrid() {
     (!wsUrl ? "LiveKit URL이 설정되지 않았습니다." : null);
 
   return (
-    <div className="border-b border-white/5 bg-black/40 backdrop-blur-md">
+    <div
+      className="border-b border-white/5 bg-black/40 backdrop-blur-md"
+      data-livekit-video-rendering={renderVideo ? "active" : "paused"}
+    >
       {/* Header */}
       <div className="flex h-9 items-center justify-between px-4">
         <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400">

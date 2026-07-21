@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { safeProfileSelect } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { createSession } from "@/lib/session";
+import { getAuthBackend } from "@/lib/auth-backend";
+import { createSupabaseAuthClient, getSupabaseSessionProfile } from "@/lib/supabase-auth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,6 +39,38 @@ export async function POST(req: NextRequest) {
         { error: "Use a valid email, username, and a password between 8 and 1024 characters" },
         { status: 400 },
       );
+    }
+
+    if (getAuthBackend() === "supabase") {
+      const supabase = await createSupabaseAuthClient();
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+        options: {
+          data: {
+            username: cleanUsername,
+            display_name:
+              typeof display_name === "string" && display_name.trim()
+                ? display_name.trim()
+                : cleanUsername,
+          },
+        },
+      });
+
+      if (error || !data.user) {
+        return NextResponse.json({ error: "Unable to create account" }, { status: 400 });
+      }
+
+      if (!data.session) {
+        return NextResponse.json({ verificationRequired: true }, { status: 202 });
+      }
+
+      const profile = await getSupabaseSessionProfile();
+      if (!profile) {
+        await supabase.auth.signOut();
+        return NextResponse.json({ error: "Profile is not active" }, { status: 403 });
+      }
+      return NextResponse.json({ user: profile });
     }
 
     const existing = await prisma.profile.findFirst({

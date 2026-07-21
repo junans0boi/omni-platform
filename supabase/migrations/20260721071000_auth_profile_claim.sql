@@ -8,10 +8,14 @@ set search_path = ''
 as $$
 declare
   requested_username text;
+  requested_profile_id uuid;
   existing_profile public.profiles%rowtype;
   affected_rows integer;
 begin
   requested_username := lower(btrim(new.raw_user_meta_data ->> 'username'));
+  -- Only trusted Auth administration can set app_metadata. Public signup metadata
+  -- therefore cannot select or take over a legacy Profile.
+  requested_profile_id := nullif(btrim(new.raw_app_meta_data ->> 'legacy_profile_id'), '')::uuid;
 
   if new.email is null or btrim(new.email) = '' then
     raise exception using errcode = '23514', message = 'legacy_claim_email_required';
@@ -34,7 +38,7 @@ begin
   select p.*
   into existing_profile
   from public.profiles as p
-  where p.id = new.id
+  where p.id = coalesce(requested_profile_id, new.id)
   for update;
 
   if found then
@@ -57,7 +61,7 @@ begin
           else 'ACTIVE'
         end,
         updated_at = timezone('utc'::text, now())
-    where p.id = new.id
+    where p.id = existing_profile.id
       and p.auth_user_id is null;
 
     get diagnostics affected_rows = row_count;

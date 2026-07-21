@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { safeProfileSelect } from "@/lib/auth";
 import { hashPassword, verifyLegacyPassword, verifyPassword } from "@/lib/password";
 import { createSession } from "@/lib/session";
+import { getAuthBackend } from "@/lib/auth-backend";
+import { createSupabaseAuthClient, getSupabaseSessionProfile } from "@/lib/supabase-auth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,6 +24,31 @@ export async function POST(req: NextRequest) {
     }
 
     const inputName = email.trim().toLowerCase();
+
+    if (getAuthBackend() === "supabase") {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inputName)) {
+        return NextResponse.json(
+          { error: "Use the verified email address for this account" },
+          { status: 400 },
+        );
+      }
+
+      const supabase = await createSupabaseAuthClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: inputName,
+        password,
+      });
+      if (error) {
+        return NextResponse.json({ error: "Invalid email or password" }, { status: 400 });
+      }
+
+      const profile = await getSupabaseSessionProfile();
+      if (!profile) {
+        await supabase.auth.signOut();
+        return NextResponse.json({ error: "Profile is not active" }, { status: 403 });
+      }
+      return NextResponse.json({ user: profile });
+    }
 
     const profile = await prisma.profile.findFirst({
       where: { OR: [{ username: inputName }, { email: inputName }] },
