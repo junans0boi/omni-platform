@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { messageBroker } from "@/lib/events";
+import { getPresenceSnapshot, messageBroker } from "@/lib/events";
 import {
   clampMessagePageLimit,
   decodeMessageCursor,
@@ -9,6 +9,8 @@ import {
 } from "@/lib/message-pagination";
 import { assertMessageReference } from "@/lib/message-threads";
 import { getDisplayRoles } from "@/lib/role-appearance-server";
+import { resolveMentionRecipients, type MentionDraft } from "@/lib/mentions";
+import { can } from "@/lib/rbac";
 
 const messageInclude = {
   profile: {
@@ -31,6 +33,7 @@ const messageInclude = {
     orderBy: { createdAt: "asc" as const },
   },
   _count: { select: { threadReplies: true } },
+  mentions: { include: { recipients: { select: { profileId: true } } } },
   threadReplies: {
     select: { createdAt: true },
     orderBy: { createdAt: "desc" as const },
@@ -140,6 +143,9 @@ export async function POST(
     const replyToId = typeof payload === "object" && payload !== null && "replyToId" in payload && typeof payload.replyToId === "string"
       ? payload.replyToId
       : null;
+    const rawMentions = typeof payload === "object" && payload !== null && "mentions" in payload && Array.isArray(payload.mentions)
+      ? payload.mentions
+      : [];
     if (!content) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
     }
@@ -165,6 +171,42 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const mentionDrafts: MentionDraft[] = [];
+    for (const value of rawMentions) {
+      if (!value || typeof value !== "object" || !("kind" in value) ||
+        !["PROFILE", "EVERYONE", "HERE"].includes(String(value.kind))) {
+        return NextResponse.json({ error: "Invalid mention" }, { status: 400 });
+      }
+      mentionDrafts.push({
+        kind: value.kind as MentionDraft["kind"],
+        ...(value.kind === "PROFILE" && "profileId" in value && typeof value.profileId === "string"
+          ? { profileId: value.profileId }
+          : {}),
+      });
+    }
+    const spaceMembers = await prisma.member.findMany({
+      where: { spaceId: channel.spaceId },
+      select: { profileId: true },
+    });
+    const presence = getPresenceSnapshot(channel.spaceId);
+    const globalAllowed = mentionDrafts.some((draft) => draft.kind !== "PROFILE")
+      ? await can(user.id, channel.spaceId, "MENTION_EVERYONE")
+      : false;
+    let resolvedMentions: Array<MentionDraft & { recipientIds: string[] }>;
+    try {
+      resolvedMentions = mentionDrafts.map((draft) => ({
+        ...draft,
+        recipientIds: resolveMentionRecipients(
+          draft,
+          spaceMembers.map((member) => ({ profileId: member.profileId, online: Boolean(presence[member.profileId]) })),
+          globalAllowed,
+        ),
+      }));
+    } catch (error) {
+      const forbidden = error instanceof Error && error.message === "Global mention permission required";
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid mention" }, { status: forbidden ? 403 : 400 });
+    }
+
     if (replyToId) {
       const target = await prisma.message.findUnique({
         where: { id: replyToId },
@@ -186,6 +228,13 @@ export async function POST(
         profileId: user.id,
         content,
         replyToId,
+        mentions: {
+          create: resolvedMentions.map((mention) => ({
+            kind: mention.kind,
+            targetProfileId: mention.kind === "PROFILE" ? mention.profileId : null,
+            recipients: { create: mention.recipientIds.map((profileId) => ({ profileId })) },
+          })),
+        },
       },
       include: messageInclude,
     });

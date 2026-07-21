@@ -43,6 +43,8 @@ export async function getSupabaseSessionProfile(): Promise<SafeProfile | null> {
 export async function updateSupabaseSessionProfile(input: {
   displayName?: string | null;
   avatarUrl?: string | null;
+  availability?: "AVAILABLE" | "IDLE" | "DND";
+  customStatus?: string | null;
 }): Promise<SafeProfile | null> {
   const supabase = await createSupabaseAuthClient();
   const { data, error } = await supabase.auth.getUser();
@@ -51,6 +53,8 @@ export async function updateSupabaseSessionProfile(input: {
   const update: Record<string, string | null> = {};
   if (input.displayName !== undefined) update.display_name = input.displayName;
   if (input.avatarUrl !== undefined) update.avatar_url = input.avatarUrl;
+  if (input.availability !== undefined) update.availability = input.availability;
+  if (input.customStatus !== undefined) update.custom_status = input.customStatus;
 
   const result = await supabase
     .from("profiles")

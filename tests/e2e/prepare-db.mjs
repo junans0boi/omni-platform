@@ -19,3 +19,9 @@ execFileSync(join(process.cwd(), "node_modules", ".bin", "prisma"), ["migrate", 
   },
   stdio: "inherit",
 });
+
+execFileSync(join(process.cwd(), "node_modules", ".bin", "prisma"), ["generate"], {
+  cwd: process.cwd(),
+  env: process.env,
+  stdio: "inherit",
+});

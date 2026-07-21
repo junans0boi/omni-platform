@@ -13,6 +13,8 @@ model Profile {
   email                String?             @unique
   displayName          String?
   avatarUrl            String?
+  availability         String              @default("AVAILABLE")
+  customStatus         String?
   password             String? // Legacy plaintext credential; cleared after a successful login
   passwordHash         String?
   createdAt            DateTime            @default(now())
@@ -28,6 +30,8 @@ model Profile {
   blockedFriendships   Friendship[]        @relation("FriendshipBlocker")
   directParticipations DirectParticipant[]
   directMessages       DirectMessage[]
+  targetedMentions     Mention[]           @relation("MentionTarget")
+  mentionRecipients    MentionRecipient[]
 }
 
 model Session {
@@ -145,9 +149,34 @@ model Message {
   threadRoot    Message?   @relation("ThreadReplies", fields: [threadRootId], references: [id], onDelete: Restrict)
   threadReplies Message[]  @relation("ThreadReplies")
   reactions     Reaction[]
+  mentions      Mention[]
 
   @@index([channelId, threadRootId, createdAt, id])
   @@index([replyToId])
+}
+
+model Mention {
+  id              String             @id @default(uuid())
+  messageId       String
+  message         Message            @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  kind            String
+  targetProfileId String?
+  targetProfile   Profile?           @relation("MentionTarget", fields: [targetProfileId], references: [id], onDelete: Restrict)
+  createdAt       DateTime           @default(now())
+  recipients      MentionRecipient[]
+
+  @@index([messageId])
+  @@index([targetProfileId])
+}
+
+model MentionRecipient {
+  mentionId String
+  mention   Mention @relation(fields: [mentionId], references: [id], onDelete: Cascade)
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@id([mentionId, profileId])
+  @@index([profileId, mentionId])
 }
 
 model Reaction {

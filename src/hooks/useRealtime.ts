@@ -61,7 +61,12 @@ export const useRealtime = () => {
     setPresenceUsers,
   } = useAppStore();
   const activeChannelId = useAppStore((state) => state.activeChannelId);
+  const profileId = profile?.id;
   useSoundEffectsUnlock();
+
+  useEffect(() => {
+    getSoundEffects()?.setDnd(profile?.availability === "DND");
+  }, [profile?.availability]);
 
   // Subscribe to every text channel so inactive-channel messages become unread.
   useEffect(() => {
@@ -83,10 +88,13 @@ export const useRealtime = () => {
           if (message) {
             if (!("_type" in message)) {
               const sound = resolveMessageSound({
-                authoredBySelf: message.profileId === profile?.id,
+                authoredBySelf: message.profileId === profileId,
                 activeChannel: message.channelId === activeChannelId,
-                // #28 supplies structured recipient semantics; never parse message prose here.
-                targetedMention: false,
+                targetedMention: Boolean(
+                  profileId && message.mentions?.some((mention) =>
+                    mention.recipients.some((recipient) => recipient.profileId === profileId),
+                  ),
+                ),
               });
               if (sound) getSoundEffects()?.emit(sound);
             }
@@ -103,7 +111,7 @@ export const useRealtime = () => {
     return () => {
       eventSources.forEach((eventSource) => eventSource.close());
     };
-  }, [activeChannelId, activeSpaceId, addMessage, channels, profile?.id]);
+  }, [activeChannelId, activeSpaceId, addMessage, channels, profileId]);
 
   // The authenticated SSE connection itself represents local presence.
   useEffect(() => {

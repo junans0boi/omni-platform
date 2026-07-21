@@ -49,6 +49,8 @@ export async function GET(
             username: true,
             displayName: true,
             avatarUrl: true,
+            availability: true,
+            customStatus: true,
             createdAt: true,
           },
         },

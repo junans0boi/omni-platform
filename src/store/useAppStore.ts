@@ -8,6 +8,8 @@ export interface Profile {
   username: string;
   displayName: string | null;
   avatarUrl: string | null;
+  availability?: "AVAILABLE" | "IDLE" | "DND";
+  customStatus?: string | null;
   createdAt: string;
   displayRole?: DisplayRole;
 }
@@ -70,6 +72,12 @@ export interface Message {
   threadReplies?: Array<{ createdAt: string }>;
   profile?: Profile;
   reactions?: Reaction[];
+  mentions?: Array<{
+    id: string;
+    kind: "PROFILE" | "EVERYONE" | "HERE";
+    targetProfileId: string | null;
+    recipients: Array<{ profileId: string }>;
+  }>;
 }
 
 export type RealtimeMessage =
@@ -163,7 +171,7 @@ interface AppState {
   createSpace: (name: string, avatarUrl?: string) => Promise<Space | null>;
   joinSpace: (inviteCode: string) => Promise<boolean>;
   deleteSpace: (spaceId: string) => Promise<void>;
-  sendMessage: (channelId: string, content: string, replyToId?: string | null) => Promise<void>;
+  sendMessage: (channelId: string, content: string, replyToId?: string | null, mentions?: import("@/lib/mentions").MentionDraft[]) => Promise<void>;
   editMessage: (channelId: string, msgId: string, content: string) => Promise<void>;
   deleteMessage: (channelId: string, msgId: string) => Promise<void>;
   toggleReaction: (channelId: string, msgId: string, emoji: string) => Promise<void>;
@@ -382,12 +390,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  sendMessage: async (channelId, content, replyToId = null) => {
+  sendMessage: async (channelId, content, replyToId = null, mentions = []) => {
     try {
       const response = await fetch(`/api/channels/${channelId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, replyToId }),
+        body: JSON.stringify({ content, replyToId, mentions }),
       });
       if (!response.ok) throw await apiError(response, "Failed to send message");
     } catch (e) {

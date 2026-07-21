@@ -82,3 +82,51 @@ test("owner creates, edits, assigns, revokes, and removes a custom role", async 
   expect((await details.json()).members.some((member: { profile: { username: string } }) => member.profile.username === memberUsername)).toBe(true);
   await memberContext.close();
 });
+
+test("@here returns only online recipients and denied global mention writes no message", async ({ browser }, testInfo) => {
+  const nonce = `${Date.now()}_${testInfo.retry}`;
+  const ownerCtx = await browser.newContext();
+  const memberCtx = await browser.newContext();
+  const ownerPage = await ownerCtx.newPage();
+  const memberPage = await memberCtx.newPage();
+
+  const ownerRes = await ownerPage.request.post("/api/auth/signup", {
+    data: { username: `here_owner_${nonce}`, display_name: "Here Owner", email: `here_owner_${nonce}@example.com`, password: "here-password" },
+  });
+  expect(ownerRes.status()).toBe(200);
+  const memberRes = await memberPage.request.post("/api/auth/signup", {
+    data: { username: `here_member_${nonce}`, display_name: "Here Member", email: `here_member_${nonce}@example.com`, password: "here-password" },
+  });
+  expect(memberRes.status()).toBe(200);
+
+  const spaceRes = await ownerPage.request.post("/api/spaces", { data: { name: "Here Space" } });
+  expect(spaceRes.status()).toBe(200);
+  const space = await spaceRes.json() as { id: string; inviteCode: string };
+  expect((await memberPage.request.put("/api/spaces", { data: { invite_code: space.inviteCode } })).status()).toBe(200);
+  const spaceData = await (await ownerPage.request.get(`/api/spaces/${space.id}`)).json() as {
+    channels: Array<{ id: string; type: string }>;
+  };
+  const channelId = spaceData.channels.find((c) => c.type === "TEXT")!.id;
+
+  // Member lacks MENTION_EVERYONE → @here returns 403; verify no message is persisted
+  const hereDenied = await memberPage.request.post(`/api/channels/${channelId}/messages`, {
+    data: { content: "@here denied", mentions: [{ kind: "HERE" }] },
+  });
+  expect(hereDenied.status()).toBe(403);
+  const listAfterDeny = await (await ownerPage.request.get(`/api/channels/${channelId}/messages`)).json() as {
+    items: Array<{ content: string }>;
+  };
+  expect(listAfterDeny.items.some((m) => m.content === "@here denied")).toBe(false);
+
+  // Owner (OWNER role → always allowed) sends @here; E2E has no Realtime presence so 0 online members
+  const hereAllowed = await ownerPage.request.post(`/api/channels/${channelId}/messages`, {
+    data: { content: "@here snapshot", mentions: [{ kind: "HERE" }] },
+  });
+  expect(hereAllowed.status()).toBe(200);
+  const hereBody = await hereAllowed.json() as { mentions: Array<{ recipients: unknown[] }> };
+  // No WebSocket connections in E2E → presenceSnapshot is empty → @here = 0 recipients
+  expect(hereBody.mentions[0].recipients).toHaveLength(0);
+
+  await ownerCtx.close();
+  await memberCtx.close();
+});

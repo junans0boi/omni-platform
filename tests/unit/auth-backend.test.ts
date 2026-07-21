@@ -46,6 +46,8 @@ describe("authentication data-plane boundary", () => {
       username: "alice",
       displayName: "Alice",
       avatarUrl: null,
+      availability: "AVAILABLE",
+      customStatus: null,
       createdAt: "2026-07-21T00:00:00.000Z",
       updatedAt: "2026-07-21T01:00:00.000Z",
     });

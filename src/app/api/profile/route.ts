@@ -3,6 +3,7 @@ import { getSessionUser, safeProfileSelect } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAuthBackend } from "@/lib/auth-backend";
 import { updateSupabaseSessionProfile } from "@/lib/supabase-auth";
+import { AVAILABILITY_VALUES, validateCustomStatus } from "@/lib/mentions";
 
 // GET /api/profile — Get current user's profile
 export async function GET() {
@@ -21,7 +22,21 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const { displayName, avatarUrl } = await req.json();
+    const { displayName, avatarUrl, availability, customStatus } = await req.json();
+    const normalizedAvailability = availability === undefined
+      ? undefined
+      : AVAILABILITY_VALUES.includes(availability) ? availability : null;
+    if (normalizedAvailability === null) {
+      return NextResponse.json({ error: "Invalid availability" }, { status: 400 });
+    }
+    let normalizedStatus: string | null | undefined;
+    try {
+      normalizedStatus = customStatus === undefined ? undefined : validateCustomStatus(
+        typeof customStatus === "string" ? customStatus : null,
+      );
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid status" }, { status: 400 });
+    }
 
     if (getAuthBackend() === "supabase") {
       const updated = await updateSupabaseSessionProfile({
@@ -31,6 +46,8 @@ export async function PATCH(req: NextRequest) {
         ...(avatarUrl !== undefined && {
           avatarUrl: typeof avatarUrl === "string" ? avatarUrl || null : null,
         }),
+        ...(normalizedAvailability !== undefined && { availability: normalizedAvailability }),
+        ...(normalizedStatus !== undefined && { customStatus: normalizedStatus }),
       });
       if (!updated) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -43,6 +60,8 @@ export async function PATCH(req: NextRequest) {
       data: {
         ...(displayName !== undefined && { displayName: displayName.trim() || null }),
         ...(avatarUrl !== undefined && { avatarUrl: avatarUrl || null }),
+        ...(normalizedAvailability !== undefined && { availability: normalizedAvailability }),
+        ...(normalizedStatus !== undefined && { customStatus: normalizedStatus }),
       },
       select: safeProfileSelect,
     });

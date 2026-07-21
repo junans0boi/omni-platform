@@ -35,12 +35,19 @@ test("a new user signs up, receives a safe session, and can log back in", async 
   await expect(page.getByRole("group", { name: "Sound effects" })).toBeVisible();
   await expect(page.getByRole("slider", { name: "Sound effects volume" })).toHaveValue("35");
   await page.getByRole("checkbox", { name: "Enable sound effects" }).uncheck();
-  await page.getByRole("button", { name: "Cancel" }).click();
+  await page.getByLabel("AVAILABILITY").selectOption("DND");
+  await page.getByLabel("CUSTOM STATUS").fill("Heads down");
+  await page.getByRole("button", { name: "Save" }).click();
 
   const sessionResponse = await page.request.get("/api/auth/me");
   expect(sessionResponse.status()).toBe(200);
   const sessionBody = await sessionResponse.json();
-  expect(sessionBody.user).toMatchObject({ username, displayName: "Baseline User" });
+  expect(sessionBody.user).toMatchObject({
+    username,
+    displayName: "Baseline User",
+    availability: "DND",
+    customStatus: "Heads down",
+  });
   expect(sessionBody.user).not.toHaveProperty("password");
   expect(sessionBody.user).not.toHaveProperty("passwordHash");
 
