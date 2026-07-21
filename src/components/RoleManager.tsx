@@ -88,6 +88,22 @@ export function RoleManager({ spaceId }: { spaceId: string }) {
     permissions: string[],
     appearance: Partial<Pick<RoleRecord, "position" | "colorHex" | "badgeKey">> = {},
   ) => {
+    // Optimistic update: apply permissions change immediately so the checkbox
+    // reflects the new state before the server responds and refresh() re-renders.
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        roles: prev.roles.map((r) => {
+          if (r.id !== role.id) return r;
+          return {
+            ...r,
+            permissions: permissions.map((permission) => ({ permission })),
+            ...appearance,
+          };
+        }),
+      };
+    });
     const response = await fetch(`/api/spaces/${spaceId}/roles/${role.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -110,6 +126,22 @@ export function RoleManager({ spaceId }: { spaceId: string }) {
   };
 
   const setAssignment = async (memberId: string, roleId: string, assigned: boolean) => {
+    // Optimistic update: flip the membership immediately so the checkbox reflects the
+    // new state before the server responds. This prevents Playwright's check() from
+    // seeing the state revert during the fetch + refresh cycle.
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        members: prev.members.map((m) => {
+          if (m.id !== memberId) return m;
+          const membershipRoles = assigned
+            ? m.membershipRoles.filter((mr) => mr.roleId !== roleId)
+            : [...m.membershipRoles, { roleId }];
+          return { ...m, membershipRoles };
+        }),
+      };
+    });
     const url = `/api/spaces/${spaceId}/members/${memberId}/roles${assigned ? `?roleId=${roleId}` : ""}`;
     const response = await fetch(url, {
       method: assigned ? "DELETE" : "PUT",

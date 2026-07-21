@@ -17,6 +17,7 @@ import { SoundSettings } from "@/components/SoundSettings";
 import { getSoundEffects } from "@/lib/browser-sound-effects";
 import { DEFAULT_SOUND_PREFERENCE, type SoundPreference } from "@/lib/sound-effects";
 import { readSoundPreference, writeSoundPreference } from "@/lib/sound-preference-storage";
+import type { MentionDraft } from "@/lib/mentions";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useBoundedVirtualList } from "@/hooks/useBoundedVirtualList";
 import { ThreadPanel } from "@/components/ThreadPanel";
@@ -116,6 +117,8 @@ export default function DashboardPage() {
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
   const [editAvatarPreview, setEditAvatarPreview] = useState<string | null>(null);
+  const [editAvailability, setEditAvailability] = useState<"AVAILABLE" | "IDLE" | "DND">("AVAILABLE");
+  const [editCustomStatus, setEditCustomStatus] = useState("");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -304,6 +307,8 @@ export default function DashboardPage() {
     if (type === "editProfile" && profile) {
       setEditDisplayName(profile.displayName || "");
       setEditAvatarPreview(profile.avatarUrl || null);
+      setEditAvailability(profile.availability ?? "AVAILABLE");
+      setEditCustomStatus(profile.customStatus ?? "");
     }
     if (type === "createChannel") setNewChannelCategoryId(categories[0]?.id || "");
   };
@@ -441,7 +446,12 @@ export default function DashboardPage() {
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName: editDisplayName.trim(), avatarUrl }),
+        body: JSON.stringify({
+          displayName: editDisplayName.trim(),
+          avatarUrl,
+          availability: editAvailability,
+          customStatus: editCustomStatus,
+        }),
       });
       if (res.ok) { setProfile(await res.json()); closeModal(); }
       else setFormError((await res.json()).error);
@@ -484,9 +494,18 @@ export default function DashboardPage() {
       setPendingFile(null); setImagePreview(null);
     }
     if (!content) return;
+    const mentions: MentionDraft[] = [];
+    if (/(^|\s)@everyone\b/i.test(content)) mentions.push({ kind: "EVERYONE" });
+    if (/(^|\s)@here\b/i.test(content)) mentions.push({ kind: "HERE" });
+    for (const member of members) {
+      const username = member.profile?.username;
+      if (username && new RegExp(`(^|\\s)@${username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(content)) {
+        mentions.push({ kind: "PROFILE", profileId: member.profileId });
+      }
+    }
     
     try {
-      await sendMessage(activeChannelId, content, replyToId);
+      await sendMessage(activeChannelId, content, replyToId, mentions);
       setMessageInput("");
       setReplyToId(null);
       setActionError(null);
@@ -1072,6 +1091,10 @@ export default function DashboardPage() {
                         </span>
                       )}
                     </span>
+                    <span className="text-[10px] text-zinc-500">
+                      {isOnline ? (member.profile?.availability ?? "AVAILABLE") : "OFFLINE"}
+                      {member.profile?.customStatus ? ` · ${member.profile.customStatus}` : ""}
+                    </span>
                     {member.role === "OWNER" && <Crown className="h-3.5 w-3.5 text-yellow-500" />}
                     {member.role === "ADMIN" && <Shield className="h-3.5 w-3.5 text-blue-500" />}
                     {isMe && <span className="text-[10px] text-zinc-500">You</span>}
@@ -1201,6 +1224,20 @@ export default function DashboardPage() {
                 <div>
                   <label className="mb-2 block text-xs font-bold text-zinc-500">DISPLAY NAME</label>
                   <input autoFocus value={editDisplayName} onChange={(e) => setEditDisplayName(e.target.value)} placeholder={profile?.username} className={`w-full rounded-xl px-4 py-3 outline-hidden border ${theme === 'dark' ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-200'}`} />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs font-bold text-zinc-500">AVAILABILITY
+                    <select aria-label="AVAILABILITY" value={editAvailability} onChange={(event) => setEditAvailability(event.target.value as typeof editAvailability)}
+                      className="mt-2 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-white">
+                      <option value="AVAILABLE">Available</option>
+                      <option value="IDLE">Idle</option>
+                      <option value="DND">Do not disturb</option>
+                    </select>
+                  </label>
+                  <label className="text-xs font-bold text-zinc-500">CUSTOM STATUS
+                    <input aria-label="CUSTOM STATUS" value={editCustomStatus} maxLength={128} onChange={(event) => setEditCustomStatus(event.target.value)}
+                      className="mt-2 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-white" />
+                  </label>
                 </div>
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3 pt-2">

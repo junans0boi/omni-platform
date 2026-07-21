@@ -1,4 +1,5 @@
 import { execFileSync, spawn } from "node:child_process";
+import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { removeE2eDatabase } from "./database-artifacts.mjs";
 
@@ -6,6 +7,7 @@ const root = process.cwd();
 const testEnvironment = {
   ...process.env,
   DATABASE_URL: "file:./e2e.db",
+  E2E_MODE: "1",
 };
 
 function executable(name) {
@@ -51,7 +53,21 @@ execFileSync(process.execPath, ["tests/e2e/prepare-db.mjs"], {
   stdio: "inherit",
 });
 
-const server = spawn(executable("next"), ["dev", "-p", "3100"], {
+// Remove stale .next cache — dev-mode chunks (e.g. 5611.js) left by a
+// previous `next dev` run cause webpack-runtime "Cannot find module" crashes
+// when `next start` tries to serve the new production build.
+// Use `rm -rf` instead of rmSync to work around Node 24/macOS ENOTEMPTY.
+execFileSync("rm", ["-rf", join(root, ".next")], { stdio: "inherit" });
+
+// Build once before starting — eliminates incremental compiler race
+// that caused /api/auth/signup 404 and .next/server ENOENT in next dev.
+execFileSync(executable("next"), ["build"], {
+  cwd: root,
+  env: testEnvironment,
+  stdio: "inherit",
+});
+
+const server = spawn(executable("next"), ["start", "-p", "3100"], {
   cwd: root,
   env: testEnvironment,
   stdio: ["ignore", "inherit", "inherit"],

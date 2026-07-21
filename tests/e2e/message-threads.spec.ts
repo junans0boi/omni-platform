@@ -51,12 +51,21 @@ test("two members reply and maintain a private thread across update, reconnect, 
 
   const pageA = await contextA.newPage();
   const pageB = await contextB.newPage();
+  // Navigate to dashboard and explicitly select the Thread Space by ID, because
+  // contextA owns two spaces (Thread Space + Other Space) and auto-select may
+  // pick the wrong one, leaving the message list empty.
   await pageA.goto("/dashboard");
   await pageB.goto("/dashboard");
+  const spaceComboA = pageA.getByRole("combobox", { name: "Select space" });
+  const spaceComboB = pageB.getByRole("combobox", { name: "Select space" });
+  await expect(spaceComboA).toBeVisible({ timeout: 15_000 });
+  await expect(spaceComboB).toBeVisible({ timeout: 15_000 });
+  await spaceComboA.selectOption({ value: space.id });
+  await spaceComboB.selectOption({ value: space.id });
   const rootRowA = pageA.getByTestId("message-row").filter({ hasText: "durable thread root" });
   const rootRowB = pageB.getByTestId("message-row").filter({ hasText: "durable thread root" });
-  await expect(rootRowA).toBeVisible();
-  await expect(rootRowB).toBeVisible();
+  await expect(rootRowA).toBeVisible({ timeout: 15_000 });
+  await expect(rootRowB).toBeVisible({ timeout: 15_000 });
 
   await rootRowB.getByRole("button", { name: "Reply to message" }).click();
   const messageInput = pageB.locator('input[placeholder^="Message #"]');
@@ -64,7 +73,8 @@ test("two members reply and maintain a private thread across update, reconnect, 
   await messageInput.press("Enter");
   const inlineRow = pageB.getByTestId("message-row").filter({ hasText: "inline reply stays in feed" });
   await expect(inlineRow).toContainText("durable thread root");
-  await expect(inlineRow.getByRole("button")).toContainText("thread_a_");
+  // The reply reference button (first button in the row) shows the original author name.
+  await expect(inlineRow.getByRole("button").first()).toContainText("thread_a_");
 
   const nestedReplyResponse = await contextA.request.post(`/api/channels/${channelId}/messages`, {
     data: { content: "invalid nested reply", replyToId: (await inlineRow.getAttribute("data-message-id"))! },
@@ -72,14 +82,16 @@ test("two members reply and maintain a private thread across update, reconnect, 
   expect(nestedReplyResponse.status()).toBe(400);
   expect(await nestedReplyResponse.json()).toMatchObject({ error: "nested_thread_reference" });
 
-  await rootRowB.getByRole("button", { name: "Open thread" }).click();
+  // After the inline reply, the rootRow filter also matches the inline reply row (which
+  // quotes "durable thread root"), so scope the button click to the first matched row.
+  await rootRowB.first().getByRole("button", { name: "Open thread" }).click();
   const panelB = pageB.getByRole("dialog", { name: "Thread" });
   await panelB.getByLabel("Reply to thread").fill("first panel reply");
   await panelB.getByRole("button", { name: "Send thread reply" }).click();
   await expect(panelB.getByTestId("thread-reply")).toContainText("first panel reply");
   await expect(pageB.getByTestId("message-row").filter({ hasText: "first panel reply" })).toHaveCount(0);
 
-  await rootRowA.getByRole("button", { name: "Open thread" }).click();
+  await rootRowA.first().getByRole("button", { name: "Open thread" }).click();
   const panelA = pageA.getByRole("dialog", { name: "Thread" });
   await expect(panelA).toContainText("first panel reply");
 
@@ -89,9 +101,14 @@ test("two members reply and maintain a private thread across update, reconnect, 
   await expect(panelA).toContainText("edited panel reply");
 
   await pageA.reload();
+  // After reload the dashboard re-runs space auto-selection; contextA has two spaces so
+  // we must re-select Thread Space explicitly to ensure the right message list loads.
+  const reloadedCombo = pageA.getByRole("combobox", { name: "Select space" });
+  await expect(reloadedCombo).toBeVisible({ timeout: 15_000 });
+  await reloadedCombo.selectOption({ value: space.id });
   const reconnectedRoot = pageA.getByTestId("message-row").filter({ hasText: "durable thread root" });
-  await expect(reconnectedRoot).toBeVisible();
-  await reconnectedRoot.getByRole("button", { name: "Open thread" }).click();
+  await expect(reconnectedRoot.first()).toBeVisible({ timeout: 15_000 });
+  await reconnectedRoot.first().getByRole("button", { name: "Open thread" }).click();
   await expect(pageA.getByRole("dialog", { name: "Thread" })).toContainText("edited panel reply");
 
   await panelB.getByRole("button", { name: "Delete thread reply" }).click();
