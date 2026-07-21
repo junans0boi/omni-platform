@@ -100,8 +100,26 @@ leaving without transfer/archive. Trusted clients are excluded from proof becaus
 bypass RLS.
 
 Account hard-delete semantics are not inferred from Auth cascading behavior. Until a
-separate account-lifecycle decision exists, no migration or UI may hard-delete an Auth user
-that owns retained domain history.
+verified account-exit transaction has revoked sessions, resolved every owned Space, and
+anonymized direct identifiers, no migration or UI may hard-delete an Auth user. Profile IDs
+are durable domain UUIDs; a nullable, unique Auth link uses `ON DELETE SET NULL` rather than
+making the Profile primary key cascade from Auth. The accepted lifecycle policy is recorded
+in [`ADR 0002`](../adr/0002-account-exit-preserves-anonymized-history.md).
+
+RLS must resolve the current active Profile through that Auth link instead of assuming
+`auth.uid()` is forever interchangeable with the Profile ID. A pending, disabled, or
+anonymized account is denied even if it presents an otherwise unexpired JWT. Membership
+checks count only active Profiles in active Spaces. The test matrix additionally proves
+that Auth deletion leaves Profile and Message history intact, anonymized accounts cannot
+read or mutate domain data, and an owner cannot remove their OWNER membership before an
+atomic transfer or Space archive.
+
+The restricted exit operation deletes Memberships and Reactions, clears public identifiers
+and profile storage, then deletes the Auth user while retaining the anonymized Profile and
+Messages. It must be idempotent and transactional across database state; external Auth and
+Storage cleanup uses a retryable ledger. Normal exit runs after a 30-day cancellation
+window, while verified legal erasure skips the window. Restore procedures replay completed
+ledger entries before serving restored data.
 
 ### 4. Shadow, freeze, cutover
 
@@ -162,7 +180,7 @@ SQLite files and credential values never appear in the commit or issue.
   -> [Supabase Realtime and private Presence transition](https://github.com/junans0boi/omni-platform/issues/59)
   -> [Supabase freeze, cutover, and rollback rehearsal](https://github.com/junans0boi/omni-platform/issues/60).
 - [Account deletion and domain-history preservation](https://github.com/junans0boi/omni-platform/issues/57)
-  is a human decision that also blocks the RLS slice.
+  is resolved by ADR 0002; the RLS slice must implement its authorization invariants.
 - The cutover rehearsal is additionally blocked by
   [the test/E2E/CI baseline](https://github.com/junans0boi/omni-platform/issues/50).
 

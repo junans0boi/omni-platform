@@ -3,14 +3,19 @@ import { closeSync, openSync } from "node:fs";
 import { join } from "node:path";
 import { e2eDatabasePath, removeE2eDatabase } from "./database-artifacts.mjs";
 
-removeE2eDatabase();
-closeSync(openSync(e2eDatabasePath, "w"));
+const databaseName = process.env.E2E_DATABASE_NAME ?? "e2e.db";
+const databasePath = databaseName === "e2e.db"
+  ? e2eDatabasePath
+  : join(process.cwd(), "prisma", databaseName);
+
+removeE2eDatabase(databaseName);
+closeSync(openSync(databasePath, "w"));
 
 execFileSync(join(process.cwd(), "node_modules", ".bin", "prisma"), ["migrate", "deploy"], {
   cwd: process.cwd(),
   env: {
     ...process.env,
-    DATABASE_URL: "file:./e2e.db",
+    DATABASE_URL: `file:./${databaseName}`,
   },
   stdio: "inherit",
 });

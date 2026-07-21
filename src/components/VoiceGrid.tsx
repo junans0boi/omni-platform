@@ -180,7 +180,10 @@ export default function VoiceGrid() {
       });
 
     return () => {
-      attachedMedia.forEach(({ track, element }) => track.detach(element));
+      attachedMedia.forEach(({ track, element }) => {
+        track.detach(element);
+        element.remove();
+      });
     };
   }, [activeVoiceChannelId, isCollapsed, livekitToken, localMedia.revision]);
 
@@ -205,7 +208,10 @@ export default function VoiceGrid() {
     });
 
     return () => {
-      attachedMedia.forEach(({ track, element }) => track.detach(element));
+      attachedMedia.forEach(({ track, element }) => {
+        track.detach(element);
+        element.remove();
+      });
     };
   }, [remoteParticipants]);
 
@@ -222,12 +228,14 @@ export default function VoiceGrid() {
         (publication) =>
           publication.source === Track.Source.ScreenShare &&
           publication.track?.kind === Track.Kind.Video &&
+          !publication.isMuted &&
           publication.isSubscribed
       );
       const visibleVideo = screenShare || publications.find(
         (publication) =>
           publication.source === Track.Source.Camera &&
           publication.track?.kind === Track.Kind.Video &&
+          !publication.isMuted &&
           publication.isSubscribed
       );
       if (!visibleVideo?.track) return [];
@@ -239,7 +247,10 @@ export default function VoiceGrid() {
     });
 
     return () => {
-      attachedMedia.forEach(({ track, element }) => track.detach(element));
+      attachedMedia.forEach(({ track, element }) => {
+        track.detach(element);
+        element.remove();
+      });
     };
   }, [isCollapsed, remoteParticipants]);
 
@@ -352,6 +363,12 @@ export default function VoiceGrid() {
               const isMutedRemote = Array.from(p.trackPublications.values()).some(
                 (pub) => pub.track?.kind === Track.Kind.Audio && pub.isMuted
               );
+              const hasAudio = Array.from(p.trackPublications.values()).some(
+                (pub) =>
+                  pub.track?.kind === Track.Kind.Audio &&
+                  pub.isSubscribed &&
+                  !pub.isMuted
+              );
               const hasScreenShare = Array.from(p.trackPublications.values()).some(
                 (pub) =>
                   pub.source === Track.Source.ScreenShare &&
@@ -362,6 +379,9 @@ export default function VoiceGrid() {
               return (
                 <div
                   key={p.sid}
+                  data-livekit-participant={p.identity}
+                  data-livekit-audio-subscribed={hasAudio}
+                  data-livekit-video-source={hasScreenShare ? "screen_share" : hasVideo ? "camera" : "none"}
                   className={`relative aspect-video overflow-hidden rounded-xl border bg-zinc-900 ${
                     hasScreenShare ? "col-span-2" : ""
                   } ${
@@ -400,6 +420,7 @@ export default function VoiceGrid() {
               inactiveClass="bg-red-500/10 text-red-400 border-red-500/20"
               onClick={toggleMute}
               title={canPublish ? (isMuted ? "Unmute" : "Mute") : "스테이지 청취자는 마이크를 사용할 수 없습니다"}
+              ariaPressed={isMuted}
               disabled={!canPublish || !isConnected}
             >
               {isEffectivelyMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
@@ -411,6 +432,7 @@ export default function VoiceGrid() {
               inactiveClass="bg-red-500/10 text-red-400 border-red-500/20"
               onClick={toggleCamera}
               title={canPublish ? (isCameraOn ? "Camera Off" : "Camera On") : "스테이지 청취자는 카메라를 사용할 수 없습니다"}
+              ariaPressed={isCameraOn}
               disabled={!canPublish || !isConnected}
             >
               {isCameraOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
@@ -422,6 +444,7 @@ export default function VoiceGrid() {
               inactiveClass="bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10"
               onClick={toggleScreenShare}
               title={canPublish ? "Share Screen" : "스테이지 청취자는 화면을 공유할 수 없습니다"}
+              ariaPressed={isScreenSharing}
               disabled={!canPublish || !isConnected}
             >
               <Monitor className="h-4 w-4" />
@@ -443,7 +466,7 @@ export default function VoiceGrid() {
 }
 
 function ControlButton({
-  children, onClick, title, active, activeClass, inactiveClass, disabled,
+  children, onClick, title, active, activeClass, inactiveClass, ariaPressed, disabled,
 }: {
   children: ReactNode;
   onClick: () => void;
@@ -451,12 +474,14 @@ function ControlButton({
   active: boolean;
   activeClass: string;
   inactiveClass: string;
+  ariaPressed?: boolean;
   disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       title={title}
+      aria-pressed={ariaPressed}
       disabled={disabled}
       className={`flex h-9 w-9 items-center justify-center rounded-full border transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 ${active ? activeClass : inactiveClass}`}
     >

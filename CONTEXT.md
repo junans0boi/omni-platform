@@ -59,8 +59,11 @@ Idea ──> Research ──> Prototype ──> PRD ──> Kanban ──> Execu
 
 * **User Identity (사용자 인증 주체)**: 로그인 자격과 세션을 소유하는 사용자 본인 확인 주체. 다른 사용자가 보는 이름·아바타인 Profile과 구분한다.
 * **Profile (프로필)**: 플랫폼 안에서 표시되고 Space 활동에 연결되는 사용자 표현. 인증 자격 자체를 뜻하지 않는다.
+* **Account Exit (계정 탈퇴)**: 사용자의 접근권한을 즉시 회수하고, 취소 유예기간 뒤 User Identity와 직접 식별정보를 제거하는 절차. 공동 대화 기록의 일괄 삭제와는 구분한다.
+* **Tombstone Profile (탈퇴 프로필)**: 탈퇴 완료 후 기존 대화의 참조 무결성만 유지하는 비식별 Profile. 모든 사용자에게 동일하게 '탈퇴한 사용자'로 표현되며 다시 로그인하거나 Membership을 가질 수 없다.
 * **Space (스페이스)**: 디스코드의 '서버(Guild)'에 해당하는 최상위 커뮤니티 공간.
 * **Membership (멤버십)**: 하나의 Profile이 하나의 Space에 참여하는 관계. Space 데이터 접근 권한의 기본 경계다.
+* **Active Membership (활성 멤버십)**: 현재 접근권한을 부여하는 Membership. 탈퇴하거나 비활성화된 Profile의 과거 관계는 접근권한으로 인정하지 않는다.
 * **Category (카테고리)**: 채널들을 묶는 그룹 (예: 🎮 게임, 🏢 업무, 🎓 강의).
 * **TextChannel (텍스트 채널)**: Supabase Realtime 기반 실시간 메시징 채널.
 * **VoiceChannel (음성 채널)**: WebRTC/LiveKit 기반의 소규모 통화 및 화면 공유 채널.
@@ -85,7 +88,8 @@ Idea ──> Research ──> Prototype ──> PRD ──> Kanban ──> Execu
 ### 5.4 추가 세부 설계 및 리소스 정책
 * **프로필 동기화**: Supabase Auth 가입 시 PostgreSQL 데이터베이스 트리거(Trigger)를 사용하여 `public.profiles` 테이블에 자동으로 사용자 레코드를 동기화함.
 * **삭제 정책 (Soft Delete)**: 스페이스 삭제 시 데이터베이스에서 즉시 레코드를 삭제하지 않고 `archived_at` 플래그를 통한 소프트 딜리트(Soft Delete) 방식을 적용함.
+* **계정 탈퇴와 기록 보존**: 탈퇴 요청 즉시 로그인과 Space 접근을 중단하고 30일의 취소 유예기간 뒤 User Identity 및 직접 식별정보를 삭제한다. 메시지는 공동 대화의 연속성을 위해 Tombstone Profile 작성자로 보존하되, 사용자는 탈퇴 전에 자신의 메시지를 삭제할 수 있고 메시지 자체에 포함된 개인정보의 삭제 요청은 별도로 처리한다. 법적으로 검증된 삭제 요청은 유예기간 없이 처리한다.
+* **Space owner 승계**: 활성 Space는 정확히 한 명의 활성 owner를 가진다. owner는 탈퇴 전에 각 Space를 같은 Space의 활성 멤버에게 명시적으로 승계하거나 archive해야 하며, 임의의 자동 승계는 하지 않는다. 법적 삭제 요청에 승계 선택이 없으면 해당 Space를 archive한다.
 * **사용자 상태 추적 (Presence)**: Supabase Realtime Presence(인메모리 웹소켓)를 사용하여 데이터베이스 부하 없이 실시간 유저 온라인/오프라인 상태를 추적 및 동기화함.
 * **파일 및 스토리지**: 아바타 및 채팅방 업로드 미디어를 Supabase Storage에 저장하고, DB 권한(RLS) 정책과 통합하여 보안을 유지함.
-
 

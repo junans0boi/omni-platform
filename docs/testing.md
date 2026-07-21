@@ -23,6 +23,7 @@ tests that mock internal Prisma/store calls are not part of the baseline.
 | `npm run test:policy` | Behavior changes must include runnable tests; Supabase migrations wait for #56 |
 | `npm run test:unit` | Vitest unit contracts |
 | `npm run test:e2e` | Chromium browser flow with isolated `prisma/e2e.db` |
+| `npm run test:livekit` | Credential-gated real two-user Voice/Stage E2E; manual/operations lane |
 | `npm run build` | Production Next build |
 | `npm run test:ci` | All gates in local CI order |
 
