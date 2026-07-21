@@ -20,9 +20,14 @@ function resolveBase() {
 }
 
 const base = resolveBase();
-const changedFiles = git("diff", "--name-only", `${base}...HEAD`)
+const changes = git("diff", "--name-status", `${base}...HEAD`)
   .split("\n")
-  .filter(Boolean);
+  .filter(Boolean)
+  .map((line) => {
+    const [status, ...paths] = line.split("\t");
+    return { status, file: paths.at(-1) };
+  });
+const changedFiles = changes.map(({ file }) => file);
 
 const behaviorFiles = changedFiles.filter(
   (file) =>
@@ -31,19 +36,24 @@ const behaviorFiles = changedFiles.filter(
     file === "prisma/schema.prisma" ||
     file.startsWith("supabase/migrations/"),
 );
-const testFiles = changedFiles.filter((file) => file.startsWith("tests/"));
+const runnableTestChanges = changes.filter(
+  ({ status, file }) =>
+    status !== "D" &&
+    (/^tests\/unit\/.*\.test\.[cm]?[jt]sx?$/.test(file) ||
+      /^tests\/e2e\/.*\.spec\.[cm]?[jt]sx?$/.test(file) ||
+      /^tests\/supabase\/.*\.test\.[cm]?[jt]sx?$/.test(file)),
+);
 const supabaseFiles = changedFiles.filter((file) => file.startsWith("supabase/migrations/"));
-const supabaseTests = changedFiles.filter((file) => file.startsWith("tests/supabase/"));
 
-if (behaviorFiles.length > 0 && testFiles.length === 0) {
+if (behaviorFiles.length > 0 && runnableTestChanges.length === 0) {
   throw new Error(
     `Behavior changed without a test change:\n${behaviorFiles.map((file) => `- ${file}`).join("\n")}`,
   );
 }
 
-if (supabaseFiles.length > 0 && supabaseTests.length === 0) {
+if (supabaseFiles.length > 0) {
   throw new Error(
-    `Supabase migrations require local policy/integration tests under tests/supabase/:\n${supabaseFiles.map((file) => `- ${file}`).join("\n")}`,
+    `Supabase migrations are blocked until the executable local Supabase test lane is installed (#56):\n${supabaseFiles.map((file) => `- ${file}`).join("\n")}`,
   );
 }
 
