@@ -30,7 +30,13 @@ export default function LoginPage() {
       if (res.ok) {
         router.push("/dashboard");
       } else {
-        setError(data.code ? t("auth.login.failed") : (data.error || t("auth.login.failed")));
+        const rawErr = data.error || "";
+        const mappedErr = rawErr === "Invalid username or password"
+          ? t("auth.error.invalidCredentials")
+          : rawErr === "Unable to log in"
+            ? t("auth.error.unableLogin")
+            : rawErr || t("auth.login.failed");
+        setError(mappedErr);
         setLoading(false);
       }
     } catch {
@@ -63,7 +69,7 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">
-              {t("auth.email")}
+              {t("auth.email")} / {t("auth.username")}
             </label>
             <input
               type="text"
@@ -106,7 +112,7 @@ export default function LoginPage() {
         </p>
         <p className="mt-3 text-center text-sm">
           <Link href="/claim" className="text-indigo-400 hover:text-indigo-300">
-            Claim or reset an existing account
+            {t("auth.claimOrReset")}
           </Link>
         </p>
       </div>

@@ -50,7 +50,13 @@ export default function SignupPage() {
         setLoading(false);
         router.replace("/dashboard");
       } else {
-        setError(data.code ? t("auth.signup.failed") : (data.error || t("auth.signup.failed")));
+        const rawErr = data.error || "";
+        const mappedErr = rawErr.includes("password between 8 and 1024")
+          ? t("auth.error.passwordLength")
+          : rawErr === "Username or email is already registered"
+            ? "사용자 이름 또는 이메일이 이미 등록되어 있습니다."
+            : rawErr || t("auth.signup.failed");
+        setError(mappedErr);
         setLoading(false);
       }
     } catch {
@@ -130,8 +136,9 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
-              {t("auth.password")}
+            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1 flex justify-between">
+              <span>{t("auth.password")}</span>
+              <span className="text-[10px] text-zinc-500 lowercase">({t("auth.passwordHint")})</span>
             </label>
             <input
               type="password"
