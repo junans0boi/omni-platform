@@ -112,9 +112,16 @@ export function NotificationDrawer({
         )}
       </button>
 
-      {/* Slide / Popover Drawer */}
+      {/* Slide / Popover Drawer Overlay */}
       {isOpen && (
-        <div className="absolute right-0 top-12 z-50 w-80 md:w-96 rounded-2xl border border-white/15 bg-slate-950/95 p-4 shadow-2xl backdrop-blur-2xl animate-fadeIn">
+        <div
+          className="fixed inset-0 z-[999] flex items-start justify-end p-4 bg-black/40 backdrop-blur-xs"
+          onClick={() => setIsOpen(false)}
+        >
+          <div
+            className="w-80 md:w-96 rounded-2xl border border-white/15 bg-slate-950/95 p-4 shadow-2xl backdrop-blur-2xl animate-fadeIn mt-12 mr-4 text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
             <div className="flex items-center gap-2">
@@ -249,7 +256,8 @@ export function NotificationDrawer({
             )}
           </div>
         </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+  </div>
+);
 }

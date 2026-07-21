@@ -118,6 +118,7 @@ export default function DashboardPage() {
   const [inviteCodeInput, setInviteCodeInput] = useState("");
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelType, setNewChannelType] = useState<"TEXT" | "VOICE" | "STAGE">("TEXT");
+  const [newChannelMode, setNewChannelMode] = useState<"GENERAL" | "MEETING" | "LECTURE">("GENERAL");
   const [newChannelCategoryId, setNewChannelCategoryId] = useState<string>("");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editDisplayName, setEditDisplayName] = useState("");
@@ -362,7 +363,12 @@ export default function DashboardPage() {
       const res = await fetch(`/api/spaces/${activeSpaceId}/channels`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newChannelName.trim(), type: newChannelType, categoryId: newChannelCategoryId || null }),
+        body: JSON.stringify({
+          name: newChannelName.trim(),
+          type: newChannelType,
+          mode: newChannelMode,
+          categoryId: newChannelCategoryId || null,
+        }),
       });
       if (res.ok) { setNewChannelName(""); closeModal(); await fetchSpaceData(activeSpaceId); }
       else setFormError((await res.json()).error);
@@ -637,8 +643,41 @@ export default function DashboardPage() {
       {/* 1. Unified Space and Channel sidebar */}
       <div className="fixed md:relative left-0 inset-y-0 md:inset-y-auto z-40 md:z-20 flex flex-col overflow-hidden border-r border-white/5 bg-[#111113] transition-all duration-300 shrink-0"
         style={{ width: isChannelSidebarOpen ? "240px" : "0px", opacity: isChannelSidebarOpen ? 1 : 0 }}>
-        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-white/5 px-3">
-          <a href="/home" aria-label="Home" title="Home" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-tr from-blue-500 to-violet-600 text-sm font-bold text-white">Ω</a>
+        {/* Top Header: Brand & Global Switcher ([로고][스페이스][친구/DM]) */}
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 px-3">
+          <div className="flex items-center gap-2">
+            <a href="/home" aria-label="Home" title="Home" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-sm font-bold text-white shadow-md shadow-indigo-600/30">Ω</a>
+            <span className="font-extrabold text-sm tracking-tight text-white">Omni Platform</span>
+          </div>
+
+          <div className="flex gap-1 bg-white/5 p-1 rounded-xl border border-white/10">
+            <button
+              onClick={() => setMainView("space")}
+              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                mainView === "space"
+                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm"
+                  : "text-zinc-400 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              <span>💬</span>
+              <span>스페이스</span>
+            </button>
+            <button
+              onClick={() => setMainView("friends")}
+              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                mainView === "friends"
+                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm"
+                  : "text-zinc-400 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              <span>👥</span>
+              <span>친구/DM</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Space Selector Bar ([스페이스 선택][+]) */}
+        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-white/5 px-3 bg-white/[0.02]">
           <select
             aria-label={t("dashboard.selectSpace")}
             value={activeSpaceId ?? ""}
@@ -646,46 +685,21 @@ export default function DashboardPage() {
               setActiveSpaceId(event.target.value || null);
               setMainView("space");
             }}
-            className="min-w-0 flex-1 truncate rounded-lg border border-white/10 bg-zinc-900 px-2 py-1.5 text-sm font-semibold text-white outline-hidden focus:border-blue-500"
+            className="min-w-0 flex-1 truncate rounded-xl border border-white/10 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white outline-hidden focus:border-indigo-500"
           >
             <option value="" disabled>{spaces.length ? t("dashboard.selectASpace") : t("dashboard.noSpaces")}</option>
             {spaces.map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}
           </select>
           <button onClick={() => openModal("createSpace")} title={t("dialog.createSpace")} aria-label={t("dialog.createSpace")}
-            className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white">
+            className="rounded-xl border border-white/10 bg-white/5 p-1.5 text-zinc-300 transition-colors hover:bg-white/10 hover:text-white">
             <Plus className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Global Navigation Switcher: Space Chat vs Friends & DMs */}
-        <div className="grid grid-cols-2 p-2 gap-1.5 border-b border-white/5 bg-white/5">
-          <button
-            onClick={() => setMainView("space")}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition ${
-              mainView === "space"
-                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm"
-                : "text-zinc-400 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <span>💬</span>
-            <span>스페이스</span>
-          </button>
-          <button
-            onClick={() => setMainView("friends")}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition ${
-              mainView === "friends"
-                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm"
-                : "text-zinc-400 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <span>👥</span>
-            <span>친구 / DM</span>
-          </button>
-        </div>
         {activeSpace ? (
           <>
-            <div className="flex h-11 shrink-0 items-center justify-between border-b border-white/5 px-4">
-              <h2 className="truncate text-xs font-semibold text-zinc-400">{t("dashboard.spaceActions")}</h2>
+            <div className="flex h-10 shrink-0 items-center justify-between border-b border-white/5 px-4">
+              <h2 className="truncate text-[11px] font-bold uppercase tracking-wider text-zinc-400">{t("dashboard.spaceActions")}</h2>
               <div className="flex gap-1">
                 <button 
                   onClick={() => {
@@ -694,22 +708,57 @@ export default function DashboardPage() {
                     setTimeout(() => setCopiedInvite(false), 2000);
                   }}
                   title={t("dashboard.copyInvite")}
-                  className={`rounded p-1.5 transition-colors ${copiedInvite ? 'text-emerald-500' : (theme === 'dark' ? 'text-zinc-400 hover:bg-white/10 hover:text-white' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900')}`}
+                  className={`rounded-lg p-1 transition-colors ${copiedInvite ? 'text-emerald-400' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`}
                 >
-                  {copiedInvite ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copiedInvite ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                 </button>
                 {isAdminOrOwner && (
-                  <button onClick={() => openModal("createChannel")} title={t("dialog.createChannel")} className={`rounded p-1.5 transition-colors ${theme === 'dark' ? 'text-zinc-400 hover:bg-white/10 hover:text-white' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'}`}><Plus className="h-4 w-4" /></button>
+                  <button onClick={() => openModal("createChannel")} title={t("dialog.createChannel")} className="rounded-lg p-1 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"><Plus className="h-3.5 w-3.5" /></button>
                 )}
                 {myMember?.role === "OWNER" ? (
-                  <button onClick={handleDeleteSpace} title={t("dashboard.deleteSpace")} className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                  <button onClick={handleDeleteSpace} title={t("dashboard.deleteSpace")} className="rounded-lg p-1 text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
                 ) : myMember ? (
-                  <button onClick={handleLeaveSpace} title={t("dashboard.leaveSpace")} className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-500"><LogOut className="h-4 w-4" /></button>
+                  <button onClick={handleLeaveSpace} title={t("dashboard.leaveSpace")} className="rounded-lg p-1 text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-400"><LogOut className="h-3.5 w-3.5" /></button>
                 ) : null}
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-2 py-4 space-y-4 no-scrollbar">
+            <div className="flex-1 overflow-y-auto px-2 py-3 space-y-3 no-scrollbar">
+              {/* Uncategorized General Channels */}
+              {channels.filter((c) => !c.categoryId).length > 0 && (
+                <div className="space-y-0.5">
+                  <div className="px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider text-zinc-500">일반 채널 (General)</div>
+                  {channels.filter((c) => !c.categoryId).map((ch) => {
+                    const isActive = ch.id === activeChannelId;
+                    const unreads = unreadBadges[ch.id] || 0;
+                    return (
+                      <div key={ch.id} className="group flex items-center">
+                        {renamingId === ch.id ? (
+                          <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") handleRenameChannel(ch.id); if (e.key === "Escape") setRenamingId(null); }}
+                            onBlur={() => setRenamingId(null)}
+                            className="w-full rounded px-2 py-1 text-sm outline-hidden bg-zinc-800 text-white border border-indigo-500 ml-2" />
+                        ) : (
+                          <button onClick={() => { setActiveChannelId(ch.id); if (ch.type !== "TEXT") joinVoiceChannel(ch.id); }}
+                            onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "channel", id: ch.id, x: e.clientX, y: e.clientY, name: ch.name }); }}
+                            className={`flex flex-1 items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs transition ${isActive ? 'bg-indigo-600/20 text-white border border-indigo-500/40 font-semibold' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'}`}>
+                            {ch.type === "TEXT" ? <Hash className="h-3.5 w-3.5 shrink-0 opacity-70" /> : <Volume2 className="h-3.5 w-3.5 shrink-0 opacity-70 text-indigo-400" />}
+                            <span className="truncate text-left flex-1">{ch.name}</span>
+                            {ch.mode === "LECTURE" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">강의</span>}
+                            {ch.mode === "MEETING" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">회의</span>}
+                            {unreads > 0 && !isActive && (
+                              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-500 px-1 text-[10px] font-bold text-white">{unreads}</span>
+                            )}
+                            {isActive && activeVoiceChannelId === ch.id && <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Categorized Channels */}
               {categories.map((cat) => (
                 <div key={cat.id}>
                   <button onClick={() => {
@@ -719,13 +768,13 @@ export default function DashboardPage() {
                     setCollapsedCats(next);
                   }}
                     onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "category", id: cat.id, x: e.clientX, y: e.clientY, name: cat.name }); }}
-                    className={`flex w-full items-center gap-1 px-1 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors ${theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-500 hover:text-zinc-800'}`}>
+                    className="flex w-full items-center gap-1 px-1 py-1 text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 transition">
                     {collapsedCats.has(cat.id) ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                     {renamingId === cat.id ? (
                       <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") handleRenameCategory(cat.id); if (e.key === "Escape") setRenamingId(null); }}
                         onBlur={() => setRenamingId(null)}
-                        className="flex-1 rounded px-1.5 py-0.5 text-xs outline-hidden bg-white text-black dark:bg-zinc-800 dark:text-white border border-blue-500" onClick={(e) => e.stopPropagation()} />
+                        className="flex-1 rounded px-1.5 py-0.5 text-xs outline-hidden bg-zinc-800 text-white border border-indigo-500" onClick={(e) => e.stopPropagation()} />
                     ) : <span className="flex-1 text-left">{cat.name}</span>}
                   </button>
 
@@ -740,15 +789,17 @@ export default function DashboardPage() {
                               <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
                                 onKeyDown={(e) => { if (e.key === "Enter") handleRenameChannel(ch.id); if (e.key === "Escape") setRenamingId(null); }}
                                 onBlur={() => setRenamingId(null)}
-                                className="w-full rounded px-2 py-1 text-sm outline-hidden bg-white text-black dark:bg-zinc-800 dark:text-white border border-blue-500 ml-5" />
+                                className="w-full rounded px-2 py-1 text-sm outline-hidden bg-zinc-800 text-white border border-indigo-500 ml-5" />
                             ) : (
                               <button onClick={() => { setActiveChannelId(ch.id); if (ch.type !== "TEXT") joinVoiceChannel(ch.id); }}
                                 onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "channel", id: ch.id, x: e.clientX, y: e.clientY, name: ch.name }); }}
-                                className={`flex flex-1 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${isActive ? (theme === 'dark' ? 'bg-white/10 text-white' : 'bg-blue-50 text-blue-700 font-medium') : (theme === 'dark' ? 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200' : 'text-zinc-600 hover:bg-black/5 hover:text-zinc-900')}`}>
-                                {ch.type === "TEXT" ? <Hash className="h-4 w-4 shrink-0 opacity-70" /> : <Volume2 className="h-4 w-4 shrink-0 opacity-70" />}
+                                className={`flex flex-1 items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs transition ${isActive ? 'bg-indigo-600/20 text-white border border-indigo-500/40 font-semibold' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'}`}>
+                                {ch.type === "TEXT" ? <Hash className="h-3.5 w-3.5 shrink-0 opacity-70" /> : <Volume2 className="h-3.5 w-3.5 shrink-0 opacity-70 text-indigo-400" />}
                                 <span className="truncate text-left flex-1">{ch.name}</span>
+                                {ch.mode === "LECTURE" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">강의</span>}
+                                {ch.mode === "MEETING" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">회의</span>}
                                 {unreads > 0 && !isActive && (
-                                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold text-white">{unreads}</span>
+                                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-500 px-1 text-[10px] font-bold text-white">{unreads}</span>
                                 )}
                                 {isActive && activeVoiceChannelId === ch.id && <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
                               </button>
@@ -762,7 +813,7 @@ export default function DashboardPage() {
               ))}
               
               {isAdminOrOwner && (
-                <button onClick={() => openModal("createCategory")} className={`flex w-full items-center gap-1.5 px-2 py-1.5 text-xs rounded-lg transition-colors mt-2 ${theme === 'dark' ? 'text-zinc-500 hover:bg-white/5 hover:text-zinc-300' : 'text-zinc-500 hover:bg-black/5 hover:text-zinc-700'}`}>
+                <button onClick={() => openModal("createCategory")} className="flex w-full items-center gap-1.5 px-2 py-1.5 text-xs rounded-xl transition text-zinc-500 hover:bg-white/5 hover:text-zinc-300 mt-2">
                   <Plus className="h-3.5 w-3.5" /> {t("dashboard.addCategory")}
                 </button>
               )}
@@ -1225,8 +1276,23 @@ export default function DashboardPage() {
                   <label className="mb-2 block text-xs font-bold text-zinc-500">CHANNEL TYPE</label>
                   <div className="flex gap-2">
                     {(["TEXT", "VOICE", "STAGE"] as const).map(t => (
-                      <button key={t} type="button" onClick={() => setNewChannelType(t)} className={`flex-1 rounded-xl border py-3 text-sm font-bold transition-colors ${newChannelType === t ? 'border-blue-500 bg-blue-500/10 text-blue-500' : (theme === 'dark' ? 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:bg-zinc-800' : 'border-slate-200 bg-slate-50 text-zinc-500 hover:bg-slate-100')}`}>
+                      <button key={t} type="button" onClick={() => setNewChannelType(t)} className={`flex-1 rounded-xl border py-3 text-sm font-bold transition-colors ${newChannelType === t ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400' : (theme === 'dark' ? 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:bg-zinc-800' : 'border-slate-200 bg-slate-50 text-zinc-500 hover:bg-slate-100')}`}>
                         {t === "TEXT" ? <Hash className="mx-auto mb-1 h-5 w-5" /> : <Volume2 className="mx-auto mb-1 h-5 w-5" />} {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-2 block text-xs font-bold text-zinc-500">CHANNEL MODE (운영 모드)</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { mode: "GENERAL", label: "💬 자유 소통", desc: "기본 대화" },
+                      { mode: "MEETING", label: "🎙️ 회의 모드", desc: "순서 대기열" },
+                      { mode: "LECTURE", label: "🎓 강의 모드", desc: "선생님/학생 손들기" },
+                    ].map(item => (
+                      <button key={item.mode} type="button" onClick={() => setNewChannelMode(item.mode as any)} className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition ${newChannelMode === item.mode ? 'border-indigo-500 bg-indigo-500/15 text-indigo-300 font-bold' : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:bg-zinc-800'}`}>
+                        <span className="text-xs font-bold">{item.label}</span>
+                        <span className="text-[10px] text-zinc-500 mt-0.5">{item.desc}</span>
                       </button>
                     ))}
                   </div>
@@ -1238,7 +1304,7 @@ export default function DashboardPage() {
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={closeModal} className={`flex-1 rounded-xl py-3 font-bold transition-colors ${theme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-slate-100 hover:bg-slate-200'}`}>Cancel</button>
-                  <button type="submit" disabled={formLoading} className="flex-1 rounded-xl bg-blue-600 py-3 font-bold text-white transition-colors hover:bg-blue-500 disabled:opacity-50">Create</button>
+                  <button type="submit" disabled={formLoading} className="flex-1 rounded-xl bg-indigo-600 py-3 font-bold text-white transition-colors hover:bg-indigo-500 disabled:opacity-50">Create</button>
                 </div>
               </form>
             )}
@@ -1250,7 +1316,7 @@ export default function DashboardPage() {
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={closeModal} className={`flex-1 rounded-xl py-3 font-bold transition-colors ${theme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-slate-100 hover:bg-slate-200'}`}>Cancel</button>
-                  <button type="submit" disabled={formLoading} className="flex-1 rounded-xl bg-blue-600 py-3 font-bold text-white transition-colors hover:bg-blue-500 disabled:opacity-50">Create</button>
+                  <button type="submit" disabled={formLoading} className="flex-1 rounded-xl bg-indigo-600 py-3 font-bold text-white transition-colors hover:bg-indigo-500 disabled:opacity-50">Create</button>
                 </div>
               </form>
             )}
@@ -1258,8 +1324,6 @@ export default function DashboardPage() {
             {modal === "editProfile" && (
               <form onSubmit={handleEditProfile} className="flex flex-col gap-4">
                 <h2 className="text-xl font-bold">{t("dashboard.profile")}</h2>
-                <LocaleSettings />
-                <SoundSettings value={soundPreference} onChange={updateSoundPreference} />
                 <div className="flex justify-center">
                   <div className="relative group overflow-hidden rounded-full h-24 w-24 border-4 border-zinc-800 bg-zinc-900 cursor-pointer" onClick={() => document.getElementById('avatar-upload')?.click()}>
                     {editAvatarPreview ? <img src={editAvatarPreview} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center text-2xl font-bold uppercase">{profile?.username.substring(0,2)}</div>}

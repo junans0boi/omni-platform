@@ -20,7 +20,7 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { name, type, categoryId } = await req.json();
+    const { name, type, categoryId, mode } = await req.json();
     if (!name || !type) {
       return NextResponse.json({ error: "name and type are required" }, { status: 400 });
     }
@@ -29,6 +29,8 @@ export async function POST(
     if (!["TEXT", "VOICE", "STAGE"].includes(channelType)) {
       return NextResponse.json({ error: "Invalid channel type" }, { status: 400 });
     }
+
+    const channelMode = mode ? (mode as string).toUpperCase() : "GENERAL";
 
     if (categoryId) {
       const category = await prisma.category.findFirst({
@@ -52,6 +54,7 @@ export async function POST(
         categoryId: categoryId || null,
         name: name.trim(),
         type: channelType,
+        mode: channelMode,
         position: (lastChannel?.position ?? -1) + 1,
       },
     });
