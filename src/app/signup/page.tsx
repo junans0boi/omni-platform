@@ -48,7 +48,7 @@ export default function SignupPage() {
       } else if (res.ok) {
         setSuccess(true);
         setLoading(false);
-        router.replace("/dashboard");
+        window.location.href = "/dashboard";
       } else {
         const rawErr = data.error || "";
         const mappedErr = rawErr.includes("password between 8 and 1024")
