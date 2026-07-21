@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useAppStore, Space, Channel, Category, Member, Profile, Message, Reaction } from "@/store/useAppStore";
+import { useAppStore, Member, Reaction } from "@/store/useAppStore";
 import { useRealtime } from "@/hooks/useRealtime";
+import { getErrorMessage } from "@/lib/errors";
 import {
   Hash, Volume2, Plus, Compass, LogOut, Trash2, Copy, X, Send,
-  Users, Settings, Mic, MicOff, Video, VideoOff, Monitor, PhoneOff,
-  ChevronDown, ChevronRight, Edit2, Crown, Shield, UserMinus, UserCheck,
+  Users, ChevronDown, ChevronRight, Edit2, Crown, Shield, UserMinus,
   ImageIcon, Smile, Sun, Moon, PanelLeftClose, PanelRightClose, PanelLeft, PanelRight, Check
 } from "lucide-react";
 import VoiceGrid from "@/components/VoiceGrid";
@@ -28,12 +28,11 @@ export default function DashboardPage() {
 
   const {
     profile, spaces, categories, channels, members, messages,
-    activeSpaceId, activeChannelId, presenceUsers, isLoading,
+    activeSpaceId, activeChannelId, presenceUsers,
     theme, unreadBadges,
     setTheme, setProfile, fetchSpaces, fetchSpaceData, fetchMessages,
     createSpace, joinSpace, deleteSpace, sendMessage, editMessage, deleteMessage, toggleReaction,
-    setActiveSpaceId, setActiveChannelId, joinVoiceChannel, leaveVoiceChannel,
-    toggleMute, toggleCamera, activeVoiceChannelId, isMuted, isCameraOn,
+    setActiveSpaceId, setActiveChannelId, joinVoiceChannel, activeVoiceChannelId,
   } = useAppStore();
 
   useRealtime();
@@ -50,7 +49,7 @@ export default function DashboardPage() {
   const [isMemberSidebarOpen, setIsMemberSidebarOpen] = useState(true);
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
-  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -70,6 +69,7 @@ export default function DashboardPage() {
   const [editAvatarPreview, setEditAvatarPreview] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ type: "channel" | "category"; id: string; x: number; y: number; name: string } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -77,12 +77,33 @@ export default function DashboardPage() {
 
   // ── Apply theme to document element ──────────────────────────────────────
   useEffect(() => {
+    const savedTheme = window.localStorage.getItem("omni-theme");
+    if (savedTheme === "light" || savedTheme === "dark") {
+      setTheme(savedTheme);
+    } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
+      setTheme("light");
+    }
+  }, [setTheme]);
+
+  useEffect(() => {
     if (theme === "dark") {
       document.documentElement.classList.add("dark");
     } else {
       document.documentElement.classList.remove("dark");
     }
+    window.localStorage.setItem("omni-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    const mobile = window.matchMedia("(max-width: 767px)");
+    const frame = window.requestAnimationFrame(() => {
+      if (mobile.matches) {
+        setIsChannelSidebarOpen(false);
+        setIsMemberSidebarOpen(false);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -140,9 +161,13 @@ export default function DashboardPage() {
   const isAdminOrOwner = myMember && ["ADMIN", "OWNER"].includes(myMember.role);
   
   // Filter members for mention dropdown
-  const mentionableMembers = members.filter(m => 
-    (m.profile?.displayName || m.profile?.username)?.toLowerCase().includes(mentionQuery.toLowerCase())
-  );
+  const mentionableMembers = mentionQuery === null
+    ? []
+    : members.filter((member) =>
+        (member.profile?.displayName || member.profile?.username)
+          ?.toLowerCase()
+          .includes(mentionQuery.toLowerCase())
+      );
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const openModal = (type: ModalType) => {
@@ -202,7 +227,7 @@ export default function DashboardPage() {
       });
       if (res.ok) { setNewChannelName(""); closeModal(); await fetchSpaceData(activeSpaceId); }
       else setFormError((await res.json()).error);
-    } catch (e: any) { setFormError(e.message); }
+    } catch (error: unknown) { setFormError(getErrorMessage(error)); }
     setFormLoading(false);
   };
 
@@ -218,7 +243,7 @@ export default function DashboardPage() {
       });
       if (res.ok) { setNewCategoryName(""); closeModal(); await fetchSpaceData(activeSpaceId); }
       else setFormError((await res.json()).error);
-    } catch (e: any) { setFormError(e.message); }
+    } catch (error: unknown) { setFormError(getErrorMessage(error)); }
     setFormLoading(false);
   };
 
@@ -241,6 +266,38 @@ export default function DashboardPage() {
     if (activeSpaceId) await fetchSpaceData(activeSpaceId);
   };
 
+  const handleRenameCategory = async (categoryId: string) => {
+    if (!renameValue.trim()) return;
+    const response = await fetch(`/api/categories/${categoryId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: renameValue.trim() }),
+    });
+    if (!response.ok) {
+      setFormError((await response.json()).error || "Failed to rename category");
+      return;
+    }
+    setRenamingId(null);
+    setRenameValue("");
+    if (activeSpaceId) await fetchSpaceData(activeSpaceId);
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (!confirm("Delete this category and all of its channels?")) return;
+    setContextMenu(null);
+    const response = await fetch(`/api/categories/${categoryId}`, { method: "DELETE" });
+    if (!response.ok) {
+      setFormError((await response.json()).error || "Failed to delete category");
+      return;
+    }
+    if (activeSpaceId) await fetchSpaceData(activeSpaceId);
+  };
+
+  const handleDeleteSpace = async () => {
+    if (!activeSpaceId || !confirm("Delete this space? This cannot be undone.")) return;
+    await deleteSpace(activeSpaceId);
+  };
+
   const handleEditProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormLoading(true);
@@ -260,7 +317,7 @@ export default function DashboardPage() {
       });
       if (res.ok) { setProfile(await res.json()); closeModal(); }
       else setFormError((await res.json()).error);
-    } catch (e: any) { setFormError(e.message); }
+    } catch (error: unknown) { setFormError(getErrorMessage(error)); }
     setFormLoading(false);
   };
 
@@ -275,7 +332,7 @@ export default function DashboardPage() {
       });
       if (activeSpaceId) await fetchSpaceData(activeSpaceId);
       closeModal(); setSelectedMember(null);
-    } catch (e: any) { setFormError(e.message); }
+    } catch (error: unknown) { setFormError(getErrorMessage(error)); }
     setFormLoading(false);
   };
 
@@ -300,19 +357,56 @@ export default function DashboardPage() {
     }
     if (!content) return;
     
-    await sendMessage(activeChannelId, content);
-    setMessageInput("");
+    try {
+      await sendMessage(activeChannelId, content);
+      setMessageInput("");
+      setActionError(null);
+    } catch (error: unknown) {
+      setActionError(getErrorMessage(error, "Failed to send message"));
+    }
   };
 
   const handleEditSubmit = async (msgId: string) => {
     if (!activeChannelId || !editingContent.trim()) return;
-    await editMessage(activeChannelId, msgId, editingContent.trim());
-    setEditingMsgId(null);
-    setEditingContent("");
+    try {
+      await editMessage(activeChannelId, msgId, editingContent.trim());
+      setEditingMsgId(null);
+      setEditingContent("");
+      setActionError(null);
+    } catch (error: unknown) {
+      setActionError(getErrorMessage(error, "Failed to edit message"));
+    }
+  };
+
+  const handleDeleteMessage = async (channelId: string, messageId: string) => {
+    try {
+      await deleteMessage(channelId, messageId);
+      setActionError(null);
+    } catch (error: unknown) {
+      setActionError(getErrorMessage(error, "Failed to delete message"));
+    }
+  };
+
+  const handleToggleReaction = async (channelId: string, messageId: string, emoji: string) => {
+    try {
+      await toggleReaction(channelId, messageId, emoji);
+      setActionError(null);
+    } catch (error: unknown) {
+      setActionError(getErrorMessage(error, "Failed to update reaction"));
+    }
+  };
+
+  const selectMention = (member: Member) => {
+    const username = member.profile?.username;
+    if (!username) return;
+    setMessageInput((current) => current.replace(/@[a-z0-9_]*$/i, `@${username} `));
+    setMentionQuery(null);
+    inputRef.current?.focus();
   };
 
   const handleMessageInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (mentionQuery !== "") {
+    if (mentionQuery !== null) {
+      if (mentionableMembers.length === 0 && e.key !== "Escape") return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setMentionIndex(prev => (prev + 1) % mentionableMembers.length);
@@ -323,13 +417,10 @@ export default function DashboardPage() {
         e.preventDefault();
         const member = mentionableMembers[mentionIndex];
         if (member) {
-          const words = messageInput.split(" ");
-          words[words.length - 1] = `@${member.profile?.username} `;
-          setMessageInput(words.join(" "));
-          setMentionQuery("");
+          selectMention(member);
         }
       } else if (e.key === "Escape") {
-        setMentionQuery("");
+        setMentionQuery(null);
       }
     } else {
       if (e.key === "Enter") handleSendMessage();
@@ -345,30 +436,28 @@ export default function DashboardPage() {
       setMentionQuery(lastWord.substring(1));
       setMentionIndex(0);
     } else {
-      setMentionQuery("");
+      setMentionQuery(null);
     }
   };
 
-  const renderMessageContent = (content: string, isMentioned: boolean) => {
-    let rendered = content;
-    // Replace markdown image
+  const renderMessageContent = (content: string) => {
     const imgMatch = content.match(/!\[.*?\]\((.*?)\)/);
+    const textContent = content.replace(/!\[.*?\]\((.*?)\)/g, "").trim();
     
     return (
       <div className="space-y-2">
         <p className="text-sm whitespace-pre-wrap leading-relaxed">
-          {content.split(" ").map((word, i) => {
-            if (word.startsWith("@")) {
-              const username = word.substring(1);
+          {textContent.split(/(@[a-z0-9_]+)/gi).map((part, i) => {
+            if (/^@[a-z0-9_]+$/i.test(part)) {
+              const username = part.substring(1);
               const isMe = profile?.username === username;
               return (
                 <span key={i} className={`px-1 rounded font-semibold ${isMe ? "bg-blue-500/30 text-blue-400" : "bg-zinc-500/20 text-blue-400"}`}>
-                  {word}
+                  {part}
                 </span>
               );
             }
-            if (word.startsWith("![")) return null;
-            return word + " ";
+            return part;
           })}
         </p>
         {imgMatch && (
@@ -384,7 +473,7 @@ export default function DashboardPage() {
     <div className={`flex h-screen w-screen overflow-hidden ${theme === 'dark' ? 'bg-[#09090b] text-[#e4e4e7]' : 'bg-[#f1f5f9] text-[#0f172a]'} transition-colors duration-300`}>
 
       {/* 1. Space sidebar */}
-      <div className={`flex w-[72px] shrink-0 flex-col items-center gap-3 border-r py-4 z-20 ${theme === 'dark' ? 'border-white/5 bg-[#0c0c0e]' : 'border-zinc-200 bg-white shadow-xs'}`}>
+      <div className={`flex w-14 sm:w-[72px] shrink-0 flex-col items-center gap-3 border-r py-4 z-50 ${theme === 'dark' ? 'border-white/5 bg-[#0c0c0e]' : 'border-zinc-200 bg-white shadow-xs'}`}>
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-tr from-blue-500 to-indigo-600 text-xl font-bold text-white shadow-lg shadow-blue-500/20 select-none">
           Ω
         </div>
@@ -415,7 +504,7 @@ export default function DashboardPage() {
             );
           })}
 
-          <button onClick={() => openModal("createSpace")}
+          <button onClick={() => openModal("createSpace")} title="Create Space" aria-label="Create Space"
             className={`flex h-12 w-12 items-center justify-center rounded-3xl border border-dashed transition-all hover:rounded-2xl ${theme === 'dark' ? 'border-zinc-700 text-zinc-400 hover:border-emerald-500 hover:bg-emerald-600/10 hover:text-emerald-400' : 'border-zinc-300 text-zinc-500 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-600'}`}>
             <Plus className="h-5 w-5" />
           </button>
@@ -429,7 +518,7 @@ export default function DashboardPage() {
       </div>
 
       {/* 2. Channel sidebar */}
-      <div className={`flex flex-col border-r transition-all duration-300 overflow-hidden shrink-0 ${theme === 'dark' ? 'border-white/5 bg-[#111113]' : 'border-zinc-200 bg-[#f8fafc]'}`}
+      <div className={`fixed sm:relative left-14 sm:left-auto inset-y-0 sm:inset-y-auto z-40 sm:z-20 flex flex-col border-r transition-all duration-300 overflow-hidden shrink-0 ${theme === 'dark' ? 'border-white/5 bg-[#111113]' : 'border-zinc-200 bg-[#f8fafc]'}`}
         style={{ width: isChannelSidebarOpen ? "240px" : "0px", opacity: isChannelSidebarOpen ? 1 : 0 }}>
         {activeSpace && (
           <>
@@ -450,6 +539,11 @@ export default function DashboardPage() {
                 {isAdminOrOwner && (
                   <button onClick={() => openModal("createChannel")} title="Create Channel" className={`rounded p-1.5 transition-colors ${theme === 'dark' ? 'text-zinc-400 hover:bg-white/10 hover:text-white' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'}`}><Plus className="h-4 w-4" /></button>
                 )}
+                {myMember?.role === "OWNER" ? (
+                  <button onClick={handleDeleteSpace} title="Delete Space" className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                ) : myMember ? (
+                  <button onClick={handleLeaveSpace} title="Leave Space" className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-500"><LogOut className="h-4 w-4" /></button>
+                ) : null}
               </div>
             </div>
 
@@ -458,7 +552,8 @@ export default function DashboardPage() {
                 <div key={cat.id}>
                   <button onClick={() => {
                     const next = new Set(collapsedCats);
-                    next.has(cat.id) ? next.delete(cat.id) : next.add(cat.id);
+                    if (next.has(cat.id)) next.delete(cat.id);
+                    else next.add(cat.id);
                     setCollapsedCats(next);
                   }}
                     onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "category", id: cat.id, x: e.clientX, y: e.clientY, name: cat.name }); }}
@@ -466,7 +561,7 @@ export default function DashboardPage() {
                     {collapsedCats.has(cat.id) ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                     {renamingId === cat.id ? (
                       <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleRenameChannel(cat.id); if (e.key === "Escape") setRenamingId(null); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleRenameCategory(cat.id); if (e.key === "Escape") setRenamingId(null); }}
                         onBlur={() => setRenamingId(null)}
                         className="flex-1 rounded px-1.5 py-0.5 text-xs outline-hidden bg-white text-black dark:bg-zinc-800 dark:text-white border border-blue-500" onClick={(e) => e.stopPropagation()} />
                     ) : <span className="flex-1 text-left">{cat.name}</span>}
@@ -537,7 +632,7 @@ export default function DashboardPage() {
             {/* Top Bar */}
             <div className={`flex h-14 shrink-0 items-center justify-between border-b px-4 ${theme === 'dark' ? 'border-white/5' : 'border-zinc-200'}`}>
               <div className="flex items-center gap-3">
-                <button onClick={() => setIsChannelSidebarOpen(!isChannelSidebarOpen)} className={`rounded p-1.5 ${theme === 'dark' ? 'hover:bg-white/10 text-zinc-400' : 'hover:bg-zinc-100 text-zinc-500'}`}>
+                <button onClick={() => setIsChannelSidebarOpen(!isChannelSidebarOpen)} aria-label="Toggle channel sidebar" className={`rounded p-1.5 ${theme === 'dark' ? 'hover:bg-white/10 text-zinc-400' : 'hover:bg-zinc-100 text-zinc-500'}`}>
                   {isChannelSidebarOpen ? <PanelLeftClose className="h-5 w-5" /> : <PanelLeft className="h-5 w-5" />}
                 </button>
                 <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-700" />
@@ -548,10 +643,10 @@ export default function DashboardPage() {
               </div>
               
               <div className="flex items-center gap-2">
-                <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className={`rounded-full p-2 transition-colors ${theme === 'dark' ? 'hover:bg-white/10 text-yellow-400' : 'hover:bg-zinc-100 text-slate-500'}`}>
+                <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label="Toggle color theme" className={`rounded-full p-2 transition-colors ${theme === 'dark' ? 'hover:bg-white/10 text-yellow-400' : 'hover:bg-zinc-100 text-slate-500'}`}>
                   {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                 </button>
-                <button onClick={() => setIsMemberSidebarOpen(!isMemberSidebarOpen)} className={`rounded p-1.5 ${theme === 'dark' ? 'hover:bg-white/10 text-zinc-400' : 'hover:bg-zinc-100 text-zinc-500'}`}>
+                <button onClick={() => setIsMemberSidebarOpen(!isMemberSidebarOpen)} aria-label="Toggle member sidebar" className={`rounded p-1.5 ${theme === 'dark' ? 'hover:bg-white/10 text-zinc-400' : 'hover:bg-zinc-100 text-zinc-500'}`}>
                   {isMemberSidebarOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRight className="h-5 w-5" />}
                 </button>
               </div>
@@ -565,7 +660,9 @@ export default function DashboardPage() {
                 const prevMsg = messages[idx - 1];
                 const isConsecutive = prevMsg && prevMsg.profileId === msg.profileId && (new Date(msg.createdAt).getTime() - new Date(prevMsg.createdAt).getTime() < 300000);
                 const isMe = msg.profileId === profile?.id;
-                const isMentioned = msg.content.includes(`@${profile?.username}`);
+                const isMentioned = profile
+                  ? new RegExp(`(^|\\s)@${profile.username}(?=\\s|$|[.,!?;:])`, "i").test(msg.content)
+                  : false;
 
                 return (
                   <div key={msg.id} className={`group relative flex gap-3 px-2 py-1 -mx-2 rounded-lg transition-colors ${isMentioned ? (theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50') : (theme === 'dark' ? 'hover:bg-white/5' : 'hover:bg-slate-50')} ${!isConsecutive ? 'mt-4' : ''}`}>
@@ -596,13 +693,13 @@ export default function DashboardPage() {
 
                       {editingMsgId === msg.id ? (
                         <div className="mt-1">
-                          <input autoFocus value={editingContent} onChange={(e) => setEditingContent(e.target.value)}
+                          <input autoFocus aria-label="Edit message content" value={editingContent} onChange={(e) => setEditingContent(e.target.value)}
                             onKeyDown={(e) => { if (e.key === "Enter") handleEditSubmit(msg.id); if (e.key === "Escape") setEditingMsgId(null); }}
                             className={`w-full rounded-lg px-3 py-2 text-sm outline-hidden border ${theme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-zinc-300'}`} />
                           <p className="text-[10px] text-zinc-500 mt-1">escape to cancel • enter to save</p>
                         </div>
                       ) : (
-                        renderMessageContent(msg.content, isMentioned)
+                        renderMessageContent(msg.content)
                       )}
 
                       {/* Edited Tag */}
@@ -620,7 +717,7 @@ export default function DashboardPage() {
                           }, {} as Record<string, Reaction[]>)).map(([emoji, reacts]) => {
                             const myReact = reacts.find(r => r.profileId === profile?.id);
                             return (
-                              <button key={emoji} onClick={() => toggleReaction(activeChannel.id, msg.id, emoji)}
+                              <button key={emoji} onClick={() => handleToggleReaction(activeChannel.id, msg.id, emoji)}
                                 className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] transition-colors ${myReact ? 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold' : (theme === 'dark' ? 'border-zinc-700 bg-zinc-800/50 hover:bg-zinc-700 text-zinc-300' : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-600')}`}>
                                 <span>{emoji}</span><span>{reacts.length}</span>
                               </button>
@@ -633,18 +730,18 @@ export default function DashboardPage() {
                     {/* Hover Action Bar */}
                     <div className={`absolute -top-3 right-4 flex items-center rounded-lg border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity ${theme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-zinc-200'}`}>
                       <div className="relative group/emoji">
-                        <button className={`p-1.5 transition-colors ${theme === 'dark' ? 'hover:bg-zinc-700 text-zinc-300' : 'hover:bg-slate-100 text-zinc-600'}`}><Smile className="h-4 w-4" /></button>
+                        <button aria-label="Add reaction" className={`p-1.5 transition-colors ${theme === 'dark' ? 'hover:bg-zinc-700 text-zinc-300' : 'hover:bg-slate-100 text-zinc-600'}`}><Smile className="h-4 w-4" /></button>
                         <div className={`absolute bottom-full right-0 mb-1 hidden group-hover/emoji:flex gap-1 rounded-full px-2 py-1 border shadow-lg ${theme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-zinc-200'}`}>
                           {EMOJIS.map(e => (
-                            <button key={e} onClick={() => toggleReaction(activeChannel.id, msg.id, e)} className="hover:scale-125 transition-transform p-1">{e}</button>
+                            <button key={e} aria-label={`React with ${e}`} onClick={() => handleToggleReaction(activeChannel.id, msg.id, e)} className="hover:scale-125 transition-transform p-1">{e}</button>
                           ))}
                         </div>
                       </div>
                       {(isMe || isAdminOrOwner) && (
                         <>
                           <div className={`w-px h-4 ${theme === 'dark' ? 'bg-zinc-700' : 'bg-zinc-200'}`} />
-                          {isMe && <button onClick={() => { setEditingMsgId(msg.id); setEditingContent(msg.content); }} className={`p-1.5 transition-colors ${theme === 'dark' ? 'hover:bg-zinc-700 text-zinc-300' : 'hover:bg-slate-100 text-zinc-600'}`}><Edit2 className="h-4 w-4" /></button>}
-                          <button onClick={() => deleteMessage(activeChannel.id, msg.id)} className={`p-1.5 transition-colors ${theme === 'dark' ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-50 text-red-500'}`}><Trash2 className="h-4 w-4" /></button>
+                          {isMe && <button aria-label="Edit message" onClick={() => { setEditingMsgId(msg.id); setEditingContent(msg.content); }} className={`p-1.5 transition-colors ${theme === 'dark' ? 'hover:bg-zinc-700 text-zinc-300' : 'hover:bg-slate-100 text-zinc-600'}`}><Edit2 className="h-4 w-4" /></button>}
+                          <button aria-label="Delete message" onClick={() => handleDeleteMessage(activeChannel.id, msg.id)} className={`p-1.5 transition-colors ${theme === 'dark' ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-50 text-red-500'}`}><Trash2 className="h-4 w-4" /></button>
                         </>
                       )}
                     </div>
@@ -657,6 +754,12 @@ export default function DashboardPage() {
 
             {/* Input Area */}
             <div className="p-4 pt-0">
+              {actionError && (
+                <div role="alert" className="mb-2 flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                  <span>{actionError}</span>
+                  <button type="button" onClick={() => setActionError(null)} aria-label="Dismiss error"><X className="h-3.5 w-3.5" /></button>
+                </div>
+              )}
               {/* Image Preview */}
               {imagePreview && (
                 <div className={`mb-2 inline-flex items-center gap-3 rounded-xl border p-2 shadow-sm ${theme === 'dark' ? 'bg-zinc-800 border-white/10' : 'bg-white border-slate-200'}`}>
@@ -667,18 +770,18 @@ export default function DashboardPage() {
               )}
 
               {/* Mention Dropdown */}
-              {mentionQuery !== "" && mentionableMembers.length > 0 && (
+              {mentionQuery !== null && mentionableMembers.length > 0 && (
                 <div className={`absolute bottom-20 left-6 z-10 w-64 rounded-xl border shadow-xl overflow-hidden ${theme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-zinc-200'}`}>
                   <div className={`px-3 py-2 text-xs font-bold uppercase tracking-wider border-b ${theme === 'dark' ? 'border-zinc-700 text-zinc-400' : 'border-zinc-100 text-zinc-500'}`}>Members</div>
                   <div className="max-h-48 overflow-y-auto">
                     {mentionableMembers.map((m, idx) => (
-                      <div key={m.id} className={`flex items-center gap-2 px-3 py-2 cursor-pointer ${idx === mentionIndex ? (theme === 'dark' ? 'bg-blue-600/20' : 'bg-blue-50') : (theme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-slate-50')}`}>
+                      <button type="button" key={m.id} onMouseDown={(event) => event.preventDefault()} onClick={() => selectMention(m)} className={`flex w-full items-center gap-2 px-3 py-2 cursor-pointer text-left ${idx === mentionIndex ? (theme === 'dark' ? 'bg-blue-600/20' : 'bg-blue-50') : (theme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-slate-50')}`}>
                         <div className={`h-6 w-6 rounded-full overflow-hidden flex items-center justify-center shrink-0 ${theme === 'dark' ? 'bg-zinc-700' : 'bg-zinc-200'}`}>
                           {m.profile?.avatarUrl ? <img src={m.profile.avatarUrl} alt="" className="h-full w-full object-cover" /> : <span className="text-[10px] font-bold uppercase">{m.profile?.username.substring(0,2)}</span>}
                         </div>
                         <span className="text-sm font-medium">{m.profile?.displayName || m.profile?.username}</span>
                         <span className={`text-xs ml-auto ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>@{m.profile?.username}</span>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -719,7 +822,7 @@ export default function DashboardPage() {
       </div>
 
       {/* 4. Members sidebar */}
-      <div className={`flex flex-col border-l transition-all duration-300 overflow-hidden shrink-0 ${theme === 'dark' ? 'border-white/5 bg-[#111113]' : 'border-zinc-200 bg-[#f8fafc]'}`}
+      <div className={`fixed lg:relative right-0 inset-y-0 lg:inset-y-auto z-40 lg:z-20 flex flex-col border-l transition-all duration-300 overflow-hidden shrink-0 ${theme === 'dark' ? 'border-white/5 bg-[#111113]' : 'border-zinc-200 bg-[#f8fafc]'}`}
         style={{ width: isMemberSidebarOpen ? "220px" : "0px", opacity: isMemberSidebarOpen ? 1 : 0 }}>
         {activeSpace && (
           <>
@@ -767,6 +870,12 @@ export default function DashboardPage() {
             <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
               onClick={() => handleDeleteChannel(contextMenu.id)}>
               <Trash2 className="h-4 w-4" /> Delete
+            </button>
+          )}
+          {contextMenu.type === "category" && (
+            <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+              onClick={() => handleDeleteCategory(contextMenu.id)}>
+              <Trash2 className="h-4 w-4" /> Delete with channels
             </button>
           )}
         </div>

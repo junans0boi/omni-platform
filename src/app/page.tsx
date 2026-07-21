@@ -15,7 +15,7 @@ export default function Home() {
         } else {
           router.replace("/login");
         }
-      } catch (e) {
+      } catch {
         router.replace("/login");
       }
     };

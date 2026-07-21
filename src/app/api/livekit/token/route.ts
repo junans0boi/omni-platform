@@ -5,13 +5,18 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   const room = req.nextUrl.searchParams.get("room");
-  const username = req.nextUrl.searchParams.get("username");
 
-  if (!room || !username) {
+  if (!room) {
     return NextResponse.json(
-      { error: "Missing room or username parameters" },
+      { error: "Missing room parameter" },
       { status: 400 }
     );
+  }
+
+  // 1. Validate current session user from local auth cookie
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const apiKey = process.env.LIVEKIT_API_KEY;
@@ -26,12 +31,6 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // 1. Validate current session user from local auth cookie
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     // 2. Fetch channel information to get space_id and type
     const channel = await prisma.channel.findUnique({
@@ -40,6 +39,13 @@ export async function GET(req: NextRequest) {
 
     if (!channel) {
       return NextResponse.json({ error: "Channel not found" }, { status: 404 });
+    }
+
+    if (channel.type === "TEXT") {
+      return NextResponse.json(
+        { error: "Text channels do not support LiveKit sessions" },
+        { status: 400 }
+      );
     }
 
     // 3. Verify user membership in the space
@@ -65,7 +71,9 @@ export async function GET(req: NextRequest) {
 
     // 5. Generate LiveKit token
     const at = new AccessToken(apiKey, apiSecret, {
-      identity: username,
+      identity: user.id,
+      name: user.displayName || user.username,
+      ttl: "15m",
     });
 
     at.addGrant({
@@ -77,7 +85,7 @@ export async function GET(req: NextRequest) {
     });
 
     const tokenJwt = await at.toJwt();
-    return NextResponse.json({ token: tokenJwt });
+    return NextResponse.json({ token: tokenJwt, canPublish });
   } catch (error) {
     console.error("Error generating LiveKit token:", error);
     return NextResponse.json(

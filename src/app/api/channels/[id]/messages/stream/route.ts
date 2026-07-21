@@ -46,7 +46,7 @@ export async function GET(
         // Send initial connection confirmation
         controller.enqueue(encoder.encode(": connected\n\n"));
 
-        const handleMessage = (msg: any) => {
+        const handleMessage = (msg: unknown) => {
           try {
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify(msg)}\n\n`)
@@ -90,7 +90,7 @@ export async function GET(
         "Content-Encoding": "none",
       },
     });
-  } catch (err: any) {
-    return new Response(err.message, { status: 500 });
+  } catch (error: unknown) {
+    return new Response(error instanceof Error ? error.message : "Unknown error", { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { PresenceSnapshot } from "@/lib/events";
 
 export interface Profile {
   id: string;
@@ -60,7 +61,31 @@ export interface Message {
   editedAt?: string | null;
   profile?: Profile;
   reactions?: Reaction[];
-  _type?: "UPDATE" | "DELETE";
+}
+
+export type RealtimeMessage =
+  | Message
+  | (Message & { _type: "UPDATE" })
+  | { id: string; channelId: string; _type: "DELETE" };
+
+let latestMessageFetch = 0;
+
+async function apiError(response: Response, fallback: string): Promise<Error> {
+  let detail = fallback;
+  try {
+    const payload: unknown = await response.json();
+    if (
+      typeof payload === "object" &&
+      payload !== null &&
+      "error" in payload &&
+      typeof payload.error === "string"
+    ) {
+      detail = payload.error;
+    }
+  } catch {
+    // Keep the operation-specific fallback for non-JSON error responses.
+  }
+  return new Error(`${detail} (${response.status})`);
 }
 
 interface AppState {
@@ -72,7 +97,7 @@ interface AppState {
   messages: Message[];
   activeSpaceId: string | null;
   activeChannelId: string | null;
-  presenceUsers: Record<string, any>;
+  presenceUsers: PresenceSnapshot;
   isLoading: boolean;
 
   // New states
@@ -91,7 +116,7 @@ interface AppState {
   fetchSpaces: () => Promise<void>;
   fetchSpaceData: (spaceId: string) => Promise<void>;
   fetchMessages: (channelId: string) => Promise<void>;
-  addMessage: (message: Message) => void;
+  addMessage: (message: RealtimeMessage) => void;
   createSpace: (name: string, avatarUrl?: string) => Promise<Space | null>;
   joinSpace: (inviteCode: string) => Promise<boolean>;
   deleteSpace: (spaceId: string) => Promise<void>;
@@ -101,7 +126,7 @@ interface AppState {
   toggleReaction: (channelId: string, msgId: string, emoji: string) => Promise<void>;
   setActiveSpaceId: (spaceId: string | null) => void;
   setActiveChannelId: (channelId: string | null) => void;
-  setPresenceUsers: (users: Record<string, any>) => void;
+  setPresenceUsers: (users: PresenceSnapshot) => void;
   clearUnreadBadge: (channelId: string) => void;
 
   // Voice/Video Actions
@@ -171,11 +196,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   fetchMessages: async (channelId) => {
+    const requestId = ++latestMessageFetch;
     try {
       const res = await fetch(`/api/channels/${channelId}/messages`);
       if (res.ok) {
-        const data = await res.json();
-        set({ messages: data || [] });
+        const data: Message[] = await res.json();
+        if (
+          requestId === latestMessageFetch &&
+          get().activeChannelId === channelId
+        ) {
+          set({ messages: data || [] });
+        }
       }
     } catch (e) {
       console.error("Error fetching messages:", e);
@@ -184,34 +215,33 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addMessage: (message) => {
     set((state) => {
+      const isActiveChannel = message.channelId === state.activeChannelId;
+
       // Handle delete event
-      if (message._type === "DELETE") {
+      if ("_type" in message && message._type === "DELETE") {
+        if (!isActiveChannel) return state;
         return { messages: state.messages.filter((m) => m.id !== message.id) };
       }
       
       // Handle update event
-      if (message._type === "UPDATE") {
+      if ("_type" in message && message._type === "UPDATE") {
+        if (!isActiveChannel) return state;
         return {
           messages: state.messages.map((m) => (m.id === message.id ? { ...m, ...message } : m)),
         };
       }
 
-      // Handle new message
-      if (state.messages.some((m) => m.id === message.id)) {
-        return state;
-      }
-
-      const newState: Partial<AppState> = { messages: [...state.messages, message] };
-
-      // Increment unread badge if message is not in active channel
-      if (message.channelId !== state.activeChannelId) {
-        newState.unreadBadges = {
+      if (!isActiveChannel) {
+        return {
+          unreadBadges: {
           ...state.unreadBadges,
           [message.channelId]: (state.unreadBadges[message.channelId] || 0) + 1,
+          },
         };
       }
 
-      return newState;
+      if (state.messages.some((m) => m.id === message.id)) return state;
+      return { messages: [...state.messages, message] };
     });
   },
 
@@ -276,53 +306,66 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   sendMessage: async (channelId, content) => {
     try {
-      await fetch(`/api/channels/${channelId}/messages`, {
+      const response = await fetch(`/api/channels/${channelId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
       });
+      if (!response.ok) throw await apiError(response, "Failed to send message");
     } catch (e) {
       console.error("Error sending message:", e);
+      throw e instanceof Error ? e : new Error("Failed to send message");
     }
   },
 
   editMessage: async (channelId, msgId, content) => {
     try {
-      await fetch(`/api/channels/${channelId}/messages/${msgId}`, {
+      const response = await fetch(`/api/channels/${channelId}/messages/${msgId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
       });
+      if (!response.ok) throw await apiError(response, "Failed to edit message");
     } catch (e) {
       console.error("Error editing message:", e);
+      throw e instanceof Error ? e : new Error("Failed to edit message");
     }
   },
 
   deleteMessage: async (channelId, msgId) => {
     try {
-      await fetch(`/api/channels/${channelId}/messages/${msgId}`, {
+      const response = await fetch(`/api/channels/${channelId}/messages/${msgId}`, {
         method: "DELETE",
       });
+      if (!response.ok) throw await apiError(response, "Failed to delete message");
     } catch (e) {
       console.error("Error deleting message:", e);
+      throw e instanceof Error ? e : new Error("Failed to delete message");
     }
   },
 
   toggleReaction: async (channelId, msgId, emoji) => {
     try {
-      await fetch(`/api/channels/${channelId}/messages/${msgId}/reactions`, {
+      const response = await fetch(`/api/channels/${channelId}/messages/${msgId}/reactions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emoji }),
       });
+      if (!response.ok) throw await apiError(response, "Failed to toggle reaction");
     } catch (e) {
       console.error("Error toggling reaction:", e);
+      throw e instanceof Error ? e : new Error("Failed to toggle reaction");
     }
   },
 
   setActiveSpaceId: (spaceId) => set({ activeSpaceId: spaceId }),
   setActiveChannelId: (channelId) => {
-    set({ activeChannelId: channelId });
+    if (get().activeChannelId === channelId) {
+      if (channelId) get().clearUnreadBadge(channelId);
+      return;
+    }
+    latestMessageFetch += 1;
+    set({ activeChannelId: channelId, messages: [] });
     if (channelId) get().clearUnreadBadge(channelId);
   },
   setPresenceUsers: (presenceUsers) => set({ presenceUsers }),
@@ -333,22 +376,24 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     try {
       set({ isLoading: true });
-      const res = await fetch(
-        `/api/livekit/token?room=${channelId}&username=${encodeURIComponent(
-          profile.displayName || profile.username
-        )}`
-      );
-      const data = await res.json();
-      if (data.token) {
+      const res = await fetch(`/api/livekit/token?room=${channelId}`);
+      if (!res.ok) throw await apiError(res, "Failed to join voice channel");
+      const data: unknown = await res.json();
+      if (
+        typeof data === "object" &&
+        data !== null &&
+        "token" in data &&
+        typeof data.token === "string"
+      ) {
         set({
           activeVoiceChannelId: channelId,
           livekitToken: data.token,
-          isMuted: false,
+          isMuted: !("canPublish" in data && data.canPublish === true),
           isCameraOn: false,
           isScreenSharing: false,
         });
       } else {
-        console.error("Failed to retrieve token:", data.error);
+        throw new Error("LiveKit token response was invalid");
       }
     } catch (e) {
       console.error("Error joining voice channel:", e);
@@ -371,4 +416,3 @@ export const useAppStore = create<AppState>((set, get) => ({
   toggleCamera: () => set((state) => ({ isCameraOn: !state.isCameraOn })),
   toggleScreenShare: () => set((state) => ({ isScreenSharing: !state.isScreenSharing })),
 }));
-

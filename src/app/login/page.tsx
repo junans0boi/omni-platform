@@ -31,7 +31,7 @@ export default function LoginPage() {
         setError(data.error || "Login failed");
         setLoading(false);
       }
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
       setLoading(false);
     }
@@ -61,13 +61,13 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">
-              Username
+              Username or email
             </label>
             <input
               type="text"
               required
               className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-500 outline-hidden transition focus:border-indigo-500 focus:bg-white/10"
-              placeholder="johndoe"
+              placeholder="johndoe or name@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />

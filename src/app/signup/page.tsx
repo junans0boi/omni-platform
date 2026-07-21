@@ -43,14 +43,13 @@ export default function SignupPage() {
       if (res.ok) {
         setSuccess(true);
         setLoading(false);
-        setTimeout(() => {
-          router.push("/login");
-        }, 2000);
+        router.push("/dashboard");
+        router.refresh();
       } else {
         setError(data.error || "Signup failed");
         setLoading(false);
       }
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
       setLoading(false);
     }
@@ -79,7 +78,7 @@ export default function SignupPage() {
 
         {success && (
           <div className="mb-4 rounded-lg bg-emerald-500/10 p-3 text-sm text-emerald-400 border border-emerald-500/20">
-            Registration successful! Redirecting to login...
+            Registration successful! Redirecting to your dashboard...
           </div>
         )}
 

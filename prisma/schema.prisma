@@ -8,31 +8,46 @@ generator client {
 }
 
 model Profile {
-  id          String    @id @default(uuid())
-  username    String    @unique
-  displayName String?
-  avatarUrl   String?
-  password    String    // Local dev plain text password for simplicity
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  spaces      Space[]   @relation("SpaceOwner")
-  members     Member[]
-  messages    Message[]
-  reactions   Reaction[]
+  id           String     @id @default(uuid())
+  username     String     @unique
+  email        String?    @unique
+  displayName  String?
+  avatarUrl    String?
+  password     String? // Legacy plaintext credential; cleared after a successful login
+  passwordHash String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  spaces       Space[]    @relation("SpaceOwner")
+  members      Member[]
+  messages     Message[]
+  reactions    Reaction[]
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([profileId])
+  @@index([expiresAt])
 }
 
 model Space {
-  id          String     @id @default(uuid())
-  name        String
-  avatarUrl   String?
-  inviteCode  String     @unique
-  ownerId     String?
-  owner       Profile?   @relation("SpaceOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  createdAt   DateTime   @default(now())
-  archivedAt  DateTime?
-  categories  Category[]
-  channels    Channel[]
-  members     Member[]
+  id         String     @id @default(uuid())
+  name       String
+  avatarUrl  String?
+  inviteCode String     @unique
+  ownerId    String?
+  owner      Profile?   @relation("SpaceOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdAt  DateTime   @default(now())
+  archivedAt DateTime?
+  categories Category[]
+  channels   Channel[]
+  members    Member[]
 }
 
 model Category {

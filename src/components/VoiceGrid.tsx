@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  ConnectionState,
   Room,
   RoomEvent,
   Track,
   RemoteParticipant,
-  Participant,
-  RoomConnectOptions,
 } from "livekit-client";
 import { useAppStore } from "@/store/useAppStore";
 import { Mic, MicOff, Video, VideoOff, Monitor, PhoneOff, ChevronUp, ChevronDown } from "lucide-react";
@@ -29,24 +28,33 @@ export default function VoiceGrid() {
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
   const [activeSpeakerSids, setActiveSpeakerSids] = useState<string[]>([]);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [connectionState, setConnectionState] = useState<ConnectionState>(
+    ConnectionState.Disconnected
+  );
+  const [localParticipantSid, setLocalParticipantSid] = useState("");
+  const [localMedia, setLocalMedia] = useState({
+    revision: 0,
+    hasScreenShare: false,
+  });
+  const [audioBlocked, setAudioBlocked] = useState(false);
   const roomRef = useRef<Room | null>(null);
   const localVideoRef = useRef<HTMLDivElement>(null);
   const remoteVideoRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const canPublish = getCanPublish(livekitToken);
+  const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "";
 
   // ── Connect / Disconnect ──────────────────────────────────────────────────
   useEffect(() => {
     if (!livekitToken || !activeVoiceChannelId) return;
 
-    const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "";
     if (!wsUrl) {
       console.error("NEXT_PUBLIC_LIVEKIT_URL is not set in .env.local");
-      setConnectionError("LiveKit URL이 설정되지 않았습니다.");
       return;
     }
 
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
-    setConnectionError(null);
+    let disposed = false;
 
     // livekit-client v2.x uses remoteParticipants (Map<string, RemoteParticipant>)
     const syncParticipants = () => {
@@ -59,122 +67,212 @@ export default function VoiceGrid() {
     room.on(RoomEvent.TrackUnsubscribed, syncParticipants);
     room.on(RoomEvent.TrackMuted, syncParticipants);
     room.on(RoomEvent.TrackUnmuted, syncParticipants);
+    room.on(RoomEvent.ConnectionStateChanged, setConnectionState);
+    const syncLocalMedia = () => {
+      const hasScreenShare = Array.from(
+        room.localParticipant.trackPublications.values()
+      ).some(
+        (publication) =>
+          publication.source === Track.Source.ScreenShare &&
+          !publication.isMuted
+      );
+      setLocalMedia((media) => ({
+        revision: media.revision + 1,
+        hasScreenShare,
+      }));
+    };
+    room.on(RoomEvent.LocalTrackPublished, syncLocalMedia);
+    room.on(RoomEvent.LocalTrackUnpublished, syncLocalMedia);
+    room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
+      setAudioBlocked(!room.canPlaybackAudio);
+    });
     room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
       setActiveSpeakerSids(speakers.map((s) => s.sid));
     });
     room.on(RoomEvent.Disconnected, () => {
       setRemoteParticipants([]);
+      setLocalParticipantSid("");
     });
 
     const connect = async () => {
+      setConnectionError(null);
+      setAudioBlocked(false);
       try {
         await room.connect(wsUrl, livekitToken);
+        if (disposed) {
+          await room.disconnect();
+          return;
+        }
+        setLocalParticipantSid(room.localParticipant.sid);
+        setAudioBlocked(!room.canPlaybackAudio);
         syncParticipants();
-      } catch (err: any) {
-        console.error("LiveKit connection error:", err);
-        setConnectionError(err.message || "연결 실패");
+      } catch (error: unknown) {
+        if (disposed) return;
+        console.error("LiveKit connection error:", error);
+        setConnectionError(getErrorMessage(error));
+        setConnectionState(ConnectionState.Disconnected);
       }
     };
 
     connect();
 
     return () => {
+      disposed = true;
+      room.removeAllListeners();
       room.disconnect();
       roomRef.current = null;
-      setRemoteParticipants([]);
     };
-  }, [livekitToken, activeVoiceChannelId]);
+  }, [livekitToken, activeVoiceChannelId, wsUrl]);
 
   // ── Mic toggle ────────────────────────────────────────────────────────────
   useEffect(() => {
     const room = roomRef.current;
-    if (!room?.localParticipant) return;
+    if (!room || connectionState !== ConnectionState.Connected || !canPublish) return;
     room.localParticipant.setMicrophoneEnabled(!isMuted).catch((e) =>
       console.warn("Mic toggle error:", e.message)
     );
-  }, [isMuted]);
+  }, [canPublish, connectionState, isMuted]);
 
   // ── Camera toggle ─────────────────────────────────────────────────────────
   useEffect(() => {
     const room = roomRef.current;
-    if (!room?.localParticipant) return;
+    if (!room || connectionState !== ConnectionState.Connected || !canPublish) return;
     room.localParticipant.setCameraEnabled(isCameraOn).catch((e) =>
       console.warn("Camera toggle error:", e.message)
     );
-  }, [isCameraOn]);
+  }, [canPublish, connectionState, isCameraOn]);
 
   // ── Screen share toggle ───────────────────────────────────────────────────
   useEffect(() => {
     const room = roomRef.current;
-    if (!room?.localParticipant) return;
+    if (!room || connectionState !== ConnectionState.Connected || !canPublish) return;
     room.localParticipant.setScreenShareEnabled(isScreenSharing).catch((e) =>
       console.warn("Screen share error:", e.message)
     );
-  }, [isScreenSharing]);
+  }, [canPublish, connectionState, isScreenSharing]);
 
   // ── Attach local video track ──────────────────────────────────────────────
   useEffect(() => {
     const room = roomRef.current;
     const container = localVideoRef.current;
-    if (!room || !container) return;
+    if (!room || !container || isCollapsed) return;
 
-    const syncLocalVideo = () => {
-      container.querySelectorAll("video").forEach((el) => el.remove());
-      const pub = room.localParticipant?.getTrackPublication(Track.Source.Camera);
-      if (pub?.track) {
-        const el = pub.track.attach();
-        el.className = "h-full w-full object-cover rounded-lg scale-x-[-1]";
-        container.appendChild(el);
-      }
-    };
-
-    // Initial sync (in case track is already published)
-    syncLocalVideo();
-
-    room.on(RoomEvent.LocalTrackPublished, syncLocalVideo);
-    room.on(RoomEvent.LocalTrackUnpublished, syncLocalVideo);
+    const videoPublications = Array.from(
+      room.localParticipant.trackPublications.values()
+    ).filter((publication) => publication.track?.kind === Track.Kind.Video);
+    const screenShare = videoPublications.find(
+      (publication) => publication.source === Track.Source.ScreenShare
+    );
+    const visiblePublications = screenShare
+      ? [screenShare]
+      : videoPublications.filter(
+          (publication) => publication.source === Track.Source.Camera
+        );
+    const attachedMedia = visiblePublications
+      .flatMap((publication) => {
+        if (!publication.track) return [];
+        const element = publication.track.attach();
+        element.className = `absolute inset-0 h-full w-full rounded-lg object-cover ${
+          publication.source === Track.Source.Camera ? "scale-x-[-1]" : ""
+        }`;
+        container.appendChild(element);
+        return [{ track: publication.track, element }];
+      });
 
     return () => {
-      room.off(RoomEvent.LocalTrackPublished, syncLocalVideo);
-      room.off(RoomEvent.LocalTrackUnpublished, syncLocalVideo);
+      attachedMedia.forEach(({ track, element }) => track.detach(element));
     };
-  }, [isCameraOn, livekitToken, activeVoiceChannelId]);
+  }, [activeVoiceChannelId, isCollapsed, livekitToken, localMedia.revision]);
 
-  // ── Attach remote video tracks to DOM ────────────────────────────────────
+  // Keep remote audio attached even while the visual grid is collapsed.
   useEffect(() => {
-    remoteParticipants.forEach((p) => {
+    const attachedMedia = remoteParticipants.flatMap((p) => {
       const container = remoteVideoRefs.current[p.sid];
-      if (!container) return;
+      if (!container) return [];
 
-      // Clear existing media elements
-      container.querySelectorAll("video, audio").forEach((el) => el.remove());
-
-      p.trackPublications.forEach((pub) => {
-        if (pub.track && pub.isSubscribed) {
-          const el = pub.track.attach();
-          if (pub.track.kind === Track.Kind.Video) {
-            el.className = "h-full w-full object-cover rounded-lg";
-          }
-          container.appendChild(el);
+      return Array.from(p.trackPublications.values()).flatMap((publication) => {
+        if (
+          !publication.track ||
+          !publication.isSubscribed ||
+          publication.track.kind !== Track.Kind.Audio
+        ) {
+          return [];
         }
+        const element = publication.track.attach();
+        container.appendChild(element);
+        return [{ track: publication.track, element }];
       });
     });
+
+    return () => {
+      attachedMedia.forEach(({ track, element }) => track.detach(element));
+    };
   }, [remoteParticipants]);
+
+  // Prefer screen share over camera so the emphasized tile cannot be obscured.
+  useEffect(() => {
+    if (isCollapsed) return;
+
+    const attachedMedia = remoteParticipants.flatMap((participant) => {
+      const container = remoteVideoRefs.current[participant.sid];
+      if (!container) return [];
+
+      const publications = Array.from(participant.trackPublications.values());
+      const screenShare = publications.find(
+        (publication) =>
+          publication.source === Track.Source.ScreenShare &&
+          publication.track?.kind === Track.Kind.Video &&
+          publication.isSubscribed
+      );
+      const visibleVideo = screenShare || publications.find(
+        (publication) =>
+          publication.source === Track.Source.Camera &&
+          publication.track?.kind === Track.Kind.Video &&
+          publication.isSubscribed
+      );
+      if (!visibleVideo?.track) return [];
+
+      const element = visibleVideo.track.attach();
+      element.className = "absolute inset-0 h-full w-full rounded-lg object-cover";
+      container.appendChild(element);
+      return [{ track: visibleVideo.track, element }];
+    });
+
+    return () => {
+      attachedMedia.forEach(({ track, element }) => track.detach(element));
+    };
+  }, [isCollapsed, remoteParticipants]);
 
   if (!activeVoiceChannelId || !livekitToken) return null;
 
-  const room = roomRef.current;
-  const localParticipant = room?.localParticipant;
+  const isConnected = connectionState === ConnectionState.Connected;
+  const isConnecting = connectionState === ConnectionState.Connecting;
+  const connectionLabel = isConnected
+    ? "Voice Connected"
+    : isConnecting
+      ? "Voice Connecting"
+      : connectionState === ConnectionState.Reconnecting ||
+          connectionState === ConnectionState.SignalReconnecting
+        ? "Voice Reconnecting"
+        : "Voice Disconnected";
+  const hasLocalScreenShare = isConnected && localMedia.hasScreenShare;
+  const isEffectivelyMuted = !canPublish || isMuted;
+  const visibleConnectionError = connectionError ||
+    (!wsUrl ? "LiveKit URL이 설정되지 않았습니다." : null);
 
   return (
     <div className="border-b border-white/5 bg-black/40 backdrop-blur-md">
       {/* Header */}
       <div className="flex h-9 items-center justify-between px-4">
         <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400">
-          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          Voice Connected
-          {connectionError && (
-            <span className="ml-2 text-red-400">— {connectionError}</span>
+          <span
+            className={`h-2 w-2 rounded-full ${
+              isConnected ? "animate-pulse bg-emerald-500" : "bg-amber-500"
+            }`}
+          />
+          {connectionLabel}
+          {visibleConnectionError && (
+            <span className="ml-2 text-red-400">— {visibleConnectionError}</span>
           )}
         </span>
         <button
@@ -190,13 +288,39 @@ export default function VoiceGrid() {
       </div>
 
       {/* Grid */}
-      {!isCollapsed && (
-        <div>
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
+          isCollapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
+        }`}
+      >
+        <div className="overflow-hidden">
+          {audioBlocked && (
+            <div className="flex justify-center px-3 pt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  const room = roomRef.current;
+                  if (!room) return;
+                  try {
+                    await room.startAudio();
+                    setAudioBlocked(!room.canPlaybackAudio);
+                  } catch (error) {
+                    setConnectionError(getErrorMessage(error));
+                  }
+                }}
+                className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-500/25"
+              >
+                오디오 재생 시작
+              </button>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-4">
             {/* Local participant tile */}
             <div
-              className={`relative aspect-video rounded-xl bg-zinc-900 border overflow-hidden ${
-                activeSpeakerSids.includes(localParticipant?.sid || "")
+              className={`relative aspect-video overflow-hidden rounded-xl border bg-zinc-900 ${
+                hasLocalScreenShare ? "col-span-2" : ""
+              } ${
+                activeSpeakerSids.includes(localParticipantSid)
                   ? "border-emerald-500 shadow-md shadow-emerald-500/20"
                   : "border-white/5"
               }`}
@@ -205,7 +329,7 @@ export default function VoiceGrid() {
                 ref={localVideoRef}
                 className="h-full w-full flex items-center justify-center"
               >
-                {!isCameraOn && (
+                {!isCameraOn && !hasLocalScreenShare && (
                   <div className="flex flex-col items-center gap-1">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold uppercase text-white">
                       You
@@ -214,7 +338,7 @@ export default function VoiceGrid() {
                 )}
               </div>
               <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
-                {isMuted && <MicOff className="h-2.5 w-2.5 text-red-400" />}
+                {isEffectivelyMuted && <MicOff className="h-2.5 w-2.5 text-red-400" />}
                 You
               </div>
             </div>
@@ -228,18 +352,29 @@ export default function VoiceGrid() {
               const isMutedRemote = Array.from(p.trackPublications.values()).some(
                 (pub) => pub.track?.kind === Track.Kind.Audio && pub.isMuted
               );
+              const hasScreenShare = Array.from(p.trackPublications.values()).some(
+                (pub) =>
+                  pub.source === Track.Source.ScreenShare &&
+                  !pub.isMuted &&
+                  pub.isSubscribed
+              );
 
               return (
                 <div
                   key={p.sid}
-                  className={`relative aspect-video rounded-xl bg-zinc-900 border overflow-hidden ${
+                  className={`relative aspect-video overflow-hidden rounded-xl border bg-zinc-900 ${
+                    hasScreenShare ? "col-span-2" : ""
+                  } ${
                     isSpeaking
                       ? "border-emerald-500 shadow-md shadow-emerald-500/20"
                       : "border-white/5"
                   }`}
                 >
                   <div
-                    ref={(el) => { remoteVideoRefs.current[p.sid] = el; }}
+                    ref={(el) => {
+                      if (el) remoteVideoRefs.current[p.sid] = el;
+                      else delete remoteVideoRefs.current[p.sid];
+                    }}
                     className="h-full w-full flex items-center justify-center"
                   >
                     {!hasVideo && (
@@ -250,7 +385,7 @@ export default function VoiceGrid() {
                   </div>
                   <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
                     {isMutedRemote && <MicOff className="h-2.5 w-2.5 text-red-400" />}
-                    {p.identity}
+                    {p.name || p.identity}
                   </div>
                 </div>
               );
@@ -260,13 +395,14 @@ export default function VoiceGrid() {
           {/* Controls */}
           <div className="flex items-center justify-center gap-3 py-2.5 border-t border-white/5">
             <ControlButton
-              active={!isMuted}
+              active={!isEffectivelyMuted}
               activeClass="bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10"
               inactiveClass="bg-red-500/10 text-red-400 border-red-500/20"
               onClick={toggleMute}
-              title={isMuted ? "Unmute" : "Mute"}
+              title={canPublish ? (isMuted ? "Unmute" : "Mute") : "스테이지 청취자는 마이크를 사용할 수 없습니다"}
+              disabled={!canPublish || !isConnected}
             >
-              {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              {isEffectivelyMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
             </ControlButton>
 
             <ControlButton
@@ -274,7 +410,8 @@ export default function VoiceGrid() {
               activeClass="bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10"
               inactiveClass="bg-red-500/10 text-red-400 border-red-500/20"
               onClick={toggleCamera}
-              title={isCameraOn ? "Camera Off" : "Camera On"}
+              title={canPublish ? (isCameraOn ? "Camera Off" : "Camera On") : "스테이지 청취자는 카메라를 사용할 수 없습니다"}
+              disabled={!canPublish || !isConnected}
             >
               {isCameraOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
             </ControlButton>
@@ -284,7 +421,8 @@ export default function VoiceGrid() {
               activeClass="bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
               inactiveClass="bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10"
               onClick={toggleScreenShare}
-              title="Share Screen"
+              title={canPublish ? "Share Screen" : "스테이지 청취자는 화면을 공유할 수 없습니다"}
+              disabled={!canPublish || !isConnected}
             >
               <Monitor className="h-4 w-4" />
             </ControlButton>
@@ -299,28 +437,51 @@ export default function VoiceGrid() {
             </button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
 function ControlButton({
-  children, onClick, title, active, activeClass, inactiveClass,
+  children, onClick, title, active, activeClass, inactiveClass, disabled,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onClick: () => void;
   title: string;
   active: boolean;
   activeClass: string;
   inactiveClass: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       title={title}
-      className={`flex h-9 w-9 items-center justify-center rounded-full border transition active:scale-95 ${active ? activeClass : inactiveClass}`}
+      disabled={disabled}
+      className={`flex h-9 w-9 items-center justify-center rounded-full border transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 ${active ? activeClass : inactiveClass}`}
     >
       {children}
     </button>
   );
+}
+
+function getCanPublish(token: string | null): boolean {
+  if (!token) return false;
+
+  try {
+    const payloadPart = token.split(".")[1];
+    if (!payloadPart) return false;
+    const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const payload = JSON.parse(atob(padded)) as {
+      video?: { canPublish?: boolean };
+    };
+    return payload.video?.canPublish === true;
+  } catch {
+    return false;
+  }
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error && error.message ? error.message : "연결 실패";
 }

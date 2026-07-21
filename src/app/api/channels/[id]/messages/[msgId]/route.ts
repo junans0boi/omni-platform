@@ -58,8 +58,8 @@ export async function PATCH(
     messageBroker.emit(`message:${channelId}`, { ...updated, _type: "UPDATE" });
 
     return NextResponse.json(updated);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }
 
@@ -114,7 +114,7 @@ export async function DELETE(
     messageBroker.emit(`message:${channelId}`, { id: msgId, _type: "DELETE" });
 
     return NextResponse.json({ success: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }

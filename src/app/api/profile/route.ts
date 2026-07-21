@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, safeProfileSelect } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/profile — Get current user's profile
-export async function GET(req: NextRequest) {
+export async function GET() {
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -27,10 +27,11 @@ export async function PATCH(req: NextRequest) {
         ...(displayName !== undefined && { displayName: displayName.trim() || null }),
         ...(avatarUrl !== undefined && { avatarUrl: avatarUrl || null }),
       },
+      select: safeProfileSelect,
     });
 
     return NextResponse.json(updated);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }

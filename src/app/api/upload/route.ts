@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
@@ -20,8 +19,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate file type
-    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
+    const allowedTypes: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/gif": "gif",
+      "image/webp": "webp",
+    };
+    const extension = allowedTypes[file.type];
+    if (!extension) {
       return NextResponse.json(
         { error: "Only image files (jpg, png, gif, webp) are allowed" },
         { status: 400 }
@@ -38,8 +43,7 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(bytes);
 
     // Generate unique filename
-    const ext = file.name.split(".").pop();
-    const filename = `${user.id}_${Date.now()}.${ext}`;
+    const filename = `${user.id}_${Date.now()}.${extension}`;
 
     const uploadDir = path.join(process.cwd(), "public", "uploads");
     await mkdir(uploadDir, { recursive: true });
@@ -49,8 +53,8 @@ export async function POST(req: NextRequest) {
 
     const url = `/uploads/${filename}`;
     return NextResponse.json({ url });
-  } catch (e: any) {
-    console.error("Upload error:", e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (error: unknown) {
+    console.error("Upload error:", error);
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }

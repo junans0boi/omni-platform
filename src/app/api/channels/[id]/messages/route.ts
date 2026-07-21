@@ -5,7 +5,7 @@ import { messageBroker } from "@/lib/events";
 
 // GET: fetch messages for the channel
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getSessionUser();
@@ -49,13 +49,27 @@ export async function GET(
             avatarUrl: true,
           },
         },
+        reactions: {
+          include: {
+            profile: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
       },
       orderBy: { createdAt: "asc" },
     });
 
     return NextResponse.json(messages);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -113,6 +127,7 @@ export async function POST(
             avatarUrl: true,
           },
         },
+        reactions: true,
       },
     });
 
@@ -120,7 +135,8 @@ export async function POST(
     messageBroker.emit(`message:${channelId}`, message);
 
     return NextResponse.json(message);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

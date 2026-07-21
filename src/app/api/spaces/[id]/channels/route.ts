@@ -33,6 +33,16 @@ export async function POST(
       return NextResponse.json({ error: "Invalid channel type" }, { status: 400 });
     }
 
+    if (categoryId) {
+      const category = await prisma.category.findFirst({
+        where: { id: categoryId, spaceId },
+        select: { id: true },
+      });
+      if (!category) {
+        return NextResponse.json({ error: "Category does not belong to this space" }, { status: 400 });
+      }
+    }
+
     // Get highest position in category
     const lastChannel = await prisma.channel.findFirst({
       where: { spaceId, categoryId: categoryId || null },
@@ -50,7 +60,7 @@ export async function POST(
     });
 
     return NextResponse.json(channel);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }

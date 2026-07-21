@@ -90,7 +90,7 @@ export async function POST(
     messageBroker.emit(`message:${channelId}`, { ...updatedMessage, _type: "UPDATE" });
 
     return NextResponse.json(updatedMessage);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }
