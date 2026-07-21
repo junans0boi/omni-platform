@@ -1,0 +1,98 @@
+import type { Locale } from "./locale";
+
+const en = {
+  "common.cancel": "Cancel",
+  "common.close": "Close",
+  "common.loading": "Loading…",
+  "common.save": "Save",
+  "error.unexpected": "An unexpected error occurred. Please try again.",
+  "landing.loading": "Loading Omni-Platform…",
+  "auth.email": "Email address",
+  "auth.password": "Password",
+  "auth.username": "Username",
+  "auth.displayName": "Display name",
+  "auth.login.title": "Welcome back",
+  "auth.login.subtitle": "Log in to enter Omni-Platform",
+  "auth.login.submit": "Log in",
+  "auth.login.submitting": "Logging in…",
+  "auth.login.failed": "Login failed",
+  "auth.login.noAccount": "Don’t have an account?",
+  "auth.signup.title": "Create account",
+  "auth.signup.subtitle": "Join Omni-Platform today",
+  "auth.signup.submit": "Sign up",
+  "auth.signup.submitting": "Registering…",
+  "auth.signup.failed": "Signup failed",
+  "auth.signup.success": "Registration successful! Redirecting to your dashboard…",
+  "auth.signup.hasAccount": "Already have an account?",
+  "auth.signup.invalidUsername": "Username must contain letters, numbers, or underscores.",
+  "dashboard.members": "Members",
+  "dashboard.channels": "Channels",
+  "dashboard.message.placeholder": "Message channel",
+  "dashboard.empty.space": "Create or join a Space to get started.",
+  "dashboard.empty.channel": "Select a channel.",
+  "dashboard.loading": "Loading workspace…",
+  "dialog.createSpace": "Create Space",
+  "dialog.joinSpace": "Join Space",
+  "dialog.createChannel": "Create Channel",
+  "dialog.createCategory": "Create Category",
+  "settings.locale.label": "Language",
+  "settings.locale.ko": "한국어",
+  "settings.locale.en": "English",
+  "settings.locale.current": "Current language: {locale}",
+} as const;
+
+export type MessageKey = keyof typeof en;
+type Catalog = Record<MessageKey, string>;
+
+const ko: Catalog = {
+  "common.cancel": "취소",
+  "common.close": "닫기",
+  "common.loading": "불러오는 중…",
+  "common.save": "저장",
+  "error.unexpected": "예상하지 못한 오류가 발생했습니다. 다시 시도해 주세요.",
+  "landing.loading": "Omni-Platform을 불러오는 중…",
+  "auth.email": "이메일 주소",
+  "auth.password": "비밀번호",
+  "auth.username": "사용자 이름",
+  "auth.displayName": "표시 이름",
+  "auth.login.title": "다시 오신 것을 환영합니다",
+  "auth.login.subtitle": "Omni-Platform에 로그인하세요",
+  "auth.login.submit": "로그인",
+  "auth.login.submitting": "로그인 중…",
+  "auth.login.failed": "로그인에 실패했습니다",
+  "auth.login.noAccount": "계정이 없으신가요?",
+  "auth.signup.title": "계정 만들기",
+  "auth.signup.subtitle": "지금 Omni-Platform에 참여하세요",
+  "auth.signup.submit": "가입하기",
+  "auth.signup.submitting": "가입 중…",
+  "auth.signup.failed": "가입에 실패했습니다",
+  "auth.signup.success": "가입했습니다! 대시보드로 이동합니다…",
+  "auth.signup.hasAccount": "이미 계정이 있으신가요?",
+  "auth.signup.invalidUsername": "사용자 이름에는 영문자, 숫자, 밑줄만 사용할 수 있습니다.",
+  "dashboard.members": "멤버",
+  "dashboard.channels": "채널",
+  "dashboard.message.placeholder": "채널에 메시지 보내기",
+  "dashboard.empty.space": "시작하려면 스페이스를 만들거나 참여하세요.",
+  "dashboard.empty.channel": "채널을 선택하세요.",
+  "dashboard.loading": "워크스페이스를 불러오는 중…",
+  "dialog.createSpace": "스페이스 만들기",
+  "dialog.joinSpace": "스페이스 참여",
+  "dialog.createChannel": "채널 만들기",
+  "dialog.createCategory": "카테고리 만들기",
+  "settings.locale.label": "언어",
+  "settings.locale.ko": "한국어",
+  "settings.locale.en": "English",
+  "settings.locale.current": "현재 언어: {locale}",
+};
+
+export const catalogs: Record<Locale, Catalog> = { ko, en };
+
+export function formatMessage(
+  locale: Locale,
+  key: MessageKey,
+  values: Record<string, string | number> = {}
+): string {
+  return catalogs[locale][key].replace(/\{([A-Za-z0-9_]+)\}/g, (token, name: string) =>
+    Object.hasOwn(values, name) ? String(values[name]) : token
+  );
+}

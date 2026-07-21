@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { cookies, headers } from "next/headers";
+import { I18nProvider } from "@/i18n/I18nProvider";
+import { LOCALE_COOKIE, resolveLocale } from "@/i18n/locale";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,14 +23,21 @@ export const metadata: Metadata = {
   publisher: "SteadyToVivid",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const requestHeaders = await headers();
+  const locale = resolveLocale(
+    cookieStore.get(LOCALE_COOKIE)?.value,
+    requestHeaders.get("accept-language")
+  );
+
   return (
     <html
-      lang="en"
+      lang={locale}
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
@@ -37,7 +47,7 @@ export default function RootLayout({
             __html: `try{const saved=localStorage.getItem("omni-theme");const dark=saved?saved==="dark":!matchMedia("(prefers-color-scheme: light)").matches;document.documentElement.classList.toggle("dark",dark)}catch{}`,
           }}
         />
-        {children}
+        <I18nProvider locale={locale}>{children}</I18nProvider>
       </body>
     </html>
   );

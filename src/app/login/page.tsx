@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useI18n } from "@/i18n/I18nProvider";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { t } = useI18n();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,11 +30,11 @@ export default function LoginPage() {
       if (res.ok) {
         router.push("/dashboard");
       } else {
-        setError(data.error || "Login failed");
+        setError(data.code ? t("auth.login.failed") : (data.error || t("auth.login.failed")));
         setLoading(false);
       }
     } catch {
-      setError("An unexpected error occurred. Please try again.");
+      setError(t("error.unexpected"));
       setLoading(false);
     }
   };
@@ -48,8 +50,8 @@ export default function LoginPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-linear-to-tr from-indigo-500 to-purple-600 text-2xl font-bold shadow-lg shadow-indigo-500/30">
             Ω
           </div>
-          <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Welcome back</h2>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Log in to enter the Omni-Platform</p>
+          <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">{t("auth.login.title")}</h2>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{t("auth.login.subtitle")}</p>
         </div>
 
         {error && (
@@ -61,7 +63,7 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">
-              Username or email
+              {t("auth.email")}
             </label>
             <input
               type="text"
@@ -75,7 +77,7 @@ export default function LoginPage() {
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">
-              Password
+              {t("auth.password")}
             </label>
             <input
               type="password"
@@ -92,14 +94,14 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/30 transition hover:bg-indigo-500 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
           >
-            {loading ? "Logging in..." : "Log In"}
+            {loading ? t("auth.login.submitting") : t("auth.login.submit")}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          Don&apos;t have an account?{" "}
+          {t("auth.login.noAccount")}{" "}
           <Link href="/signup" className="font-semibold text-indigo-400 hover:text-indigo-300">
-            Sign up
+            {t("auth.signup.submit")}
           </Link>
         </p>
       </div>

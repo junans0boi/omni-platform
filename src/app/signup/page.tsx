@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useI18n } from "@/i18n/I18nProvider";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -13,6 +14,7 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const router = useRouter();
+  const { t } = useI18n();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,7 +23,7 @@ export default function SignupPage() {
 
     const formattedUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
     if (!formattedUsername) {
-      setError("Username must contain alphanumeric characters or underscores.");
+      setError(t("auth.signup.invalidUsername"));
       setLoading(false);
       return;
     }
@@ -46,11 +48,11 @@ export default function SignupPage() {
         router.push("/dashboard");
         router.refresh();
       } else {
-        setError(data.error || "Signup failed");
+        setError(data.code ? t("auth.signup.failed") : (data.error || t("auth.signup.failed")));
         setLoading(false);
       }
     } catch {
-      setError("An unexpected error occurred. Please try again.");
+      setError(t("error.unexpected"));
       setLoading(false);
     }
   };
@@ -66,8 +68,8 @@ export default function SignupPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-linear-to-tr from-indigo-500 to-purple-600 text-2xl font-bold shadow-lg shadow-indigo-500/30">
             Ω
           </div>
-          <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Create account</h2>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Join the Omni-Platform today</p>
+          <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">{t("auth.signup.title")}</h2>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{t("auth.signup.subtitle")}</p>
         </div>
 
         {error && (
@@ -78,14 +80,14 @@ export default function SignupPage() {
 
         {success && (
           <div className="mb-4 rounded-lg bg-emerald-500/10 p-3 text-sm text-emerald-400 border border-emerald-500/20">
-            Registration successful! Redirecting to your dashboard...
+            {t("auth.signup.success")}
           </div>
         )}
 
         <form onSubmit={handleSignup} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
-              Username
+              {t("auth.username")}
             </label>
             <input
               type="text"
@@ -99,7 +101,7 @@ export default function SignupPage() {
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
-              Display Name
+              {t("auth.displayName")}
             </label>
             <input
               type="text"
@@ -113,7 +115,7 @@ export default function SignupPage() {
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
-              Email Address
+              {t("auth.email")}
             </label>
             <input
               type="email"
@@ -127,7 +129,7 @@ export default function SignupPage() {
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
-              Password
+              {t("auth.password")}
             </label>
             <input
               type="password"
@@ -144,14 +146,14 @@ export default function SignupPage() {
             disabled={loading || success}
             className="w-full rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/30 transition hover:bg-indigo-500 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
           >
-            {loading ? "Registering..." : "Sign Up"}
+            {loading ? t("auth.signup.submitting") : t("auth.signup.submit")}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          Already have an account?{" "}
+          {t("auth.signup.hasAccount")}{" "}
           <Link href="/login" className="font-semibold text-indigo-400 hover:text-indigo-300">
-            Log in
+            {t("auth.login.submit")}
           </Link>
         </p>
       </div>
