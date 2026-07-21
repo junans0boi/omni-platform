@@ -86,6 +86,7 @@ export default function DashboardPage() {
   useRealtime();
 
   // ── UI state ──────────────────────────────────────────────────────────────
+  const [mounted, setMounted] = useState(false);
   const [modal, setModal] = useState<ModalType>(null);
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
   const [copiedInvite, setCopiedInvite] = useState(false);
@@ -103,6 +104,10 @@ export default function DashboardPage() {
   const [mentionIndex, setMentionIndex] = useState(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [mainView, setMainView] = useState<"space" | "friends">("space");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const previousFirstMessageRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -638,6 +643,17 @@ export default function DashboardPage() {
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
+  if (!mounted) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#09090b] text-[#e4e4e7]">
+        <div className="flex items-center gap-3">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+          <span className="text-xs font-semibold text-zinc-400">Loading Omni Platform...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#09090b] text-[#e4e4e7]">
       {/* 1. Unified Space and Channel sidebar */}
