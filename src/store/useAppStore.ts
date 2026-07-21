@@ -94,7 +94,11 @@ function loadUnreadBadges(profileId: string): Record<string, number> {
 
 function saveUnreadBadges(profileId: string | undefined, badges: Record<string, number>) {
   if (typeof window === "undefined" || !profileId) return;
-  localStorage.setItem(unreadStorageKey(profileId), JSON.stringify(badges));
+  try {
+    localStorage.setItem(unreadStorageKey(profileId), JSON.stringify(badges));
+  } catch {
+    // Storage can be disabled; the in-memory badge still remains usable.
+  }
 }
 
 async function apiError(response: Response, fallback: string): Promise<Error> {

@@ -2,23 +2,11 @@
 CREATE TABLE "Profile" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "username" TEXT NOT NULL,
-    "email" TEXT,
     "displayName" TEXT,
     "avatarUrl" TEXT,
-    "password" TEXT,
-    "passwordHash" TEXT,
+    "password" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
-);
-
--- CreateTable
-CREATE TABLE "Session" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "tokenHash" TEXT NOT NULL,
-    "profileId" TEXT NOT NULL,
-    "expiresAt" DATETIME NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "Session_profileId_fkey" FOREIGN KEY ("profileId") REFERENCES "Profile" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -92,10 +80,6 @@ CREATE TABLE "Reaction" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Profile_username_key" ON "Profile"("username");
-CREATE UNIQUE INDEX "Profile_email_key" ON "Profile"("email");
-CREATE UNIQUE INDEX "Session_tokenHash_key" ON "Session"("tokenHash");
-CREATE INDEX "Session_profileId_idx" ON "Session"("profileId");
-CREATE INDEX "Session_expiresAt_idx" ON "Session"("expiresAt");
 CREATE UNIQUE INDEX "Space_inviteCode_key" ON "Space"("inviteCode");
 CREATE UNIQUE INDEX "Member_spaceId_profileId_key" ON "Member"("spaceId", "profileId");
 CREATE UNIQUE INDEX "Reaction_messageId_profileId_emoji_key" ON "Reaction"("messageId", "profileId", "emoji");
