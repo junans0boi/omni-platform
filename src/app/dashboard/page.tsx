@@ -838,7 +838,17 @@ export default function DashboardPage() {
                     <div className="flex-1 min-w-0">
                       {!isConsecutive && (
                         <div className="flex items-baseline gap-2 mb-0.5">
-                          <span className="text-[15px] font-bold">{msg.profile?.displayName || msg.profile?.username}</span>
+                          <span
+                            className="text-[15px] font-bold"
+                            style={{ color: msg.profile?.displayRole?.colorHex }}
+                          >
+                            {msg.profile?.displayName || msg.profile?.username}
+                            {msg.profile?.displayRole?.badgeKey && (
+                              <span className="ml-1 text-[10px] text-zinc-400" aria-label={`${msg.profile.displayRole.name} role, ${msg.profile.displayRole.badgeKey} badge`}>
+                                [{msg.profile.displayRole.badgeKey}]
+                              </span>
+                            )}
+                          </span>
                           <span className="text-[11px] text-zinc-400 font-medium">
                             {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
@@ -1051,7 +1061,17 @@ export default function DashboardPage() {
                       {member.profile?.avatarUrl ? <img src={member.profile.avatarUrl} alt="" className="h-full w-full object-cover" /> : <span className="text-[10px] font-bold uppercase">{member.profile?.username.substring(0,2)}</span>}
                       <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#111113]" style={{ backgroundColor: isOnline ? "#10b981" : "#64748b" }} />
                     </div>
-                    <span className="min-w-0 flex-1 truncate text-sm font-semibold">{member.profile?.displayName || member.profile?.username}</span>
+                    <span
+                      className="min-w-0 flex-1 truncate text-sm font-semibold"
+                      style={{ color: member.profile?.displayRole?.colorHex }}
+                    >
+                      {member.profile?.displayName || member.profile?.username}
+                      {member.profile?.displayRole?.badgeKey && (
+                        <span className="ml-1 text-[10px] text-zinc-400" aria-label={`${member.profile.displayRole.name} role, ${member.profile.displayRole.badgeKey} badge`}>
+                          [{member.profile.displayRole.badgeKey}]
+                        </span>
+                      )}
+                    </span>
                     {member.role === "OWNER" && <Crown className="h-3.5 w-3.5 text-yellow-500" />}
                     {member.role === "ADMIN" && <Shield className="h-3.5 w-3.5 text-blue-500" />}
                     {isMe && <span className="text-[10px] text-zinc-500">You</span>}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getDisplayRoles } from "@/lib/role-appearance-server";
 
 // GET: fetch space details (categories, channels, members)
 export async function GET(
@@ -53,11 +54,15 @@ export async function GET(
         },
       },
     });
+    const displayRoles = await getDisplayRoles(spaceId, members.map((member) => member.profileId));
 
     return NextResponse.json({
       categories,
       channels,
-      members,
+      members: members.map((member) => ({
+        ...member,
+        profile: { ...member.profile, displayRole: displayRoles.get(member.profileId) },
+      })),
     });
   } catch (error: unknown) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });

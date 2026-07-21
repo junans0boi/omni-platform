@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { PresenceSnapshot } from "@/lib/events";
 import { MAX_RETAINED_MESSAGES, mergeMessagePage } from "@/lib/message-pagination";
+import type { DisplayRole } from "@/lib/role-appearance";
 
 export interface Profile {
   id: string;
@@ -8,6 +9,7 @@ export interface Profile {
   displayName: string | null;
   avatarUrl: string | null;
   createdAt: string;
+  displayRole?: DisplayRole;
 }
 
 export interface Space {

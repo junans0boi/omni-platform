@@ -8,6 +8,7 @@ import {
   encodeMessageCursor,
 } from "@/lib/message-pagination";
 import { assertMessageReference } from "@/lib/message-threads";
+import { getDisplayRoles } from "@/lib/role-appearance-server";
 
 const messageInclude = {
   profile: {
@@ -101,9 +102,14 @@ export async function GET(
 
     const hasMore = messages.length > limit;
     const items = messages.slice(0, limit).reverse();
+    const displayRoles = await getDisplayRoles(channel.spaceId, items.map((message) => message.profileId));
+    const decoratedItems = items.map((message) => ({
+      ...message,
+      profile: { ...message.profile, displayRole: displayRoles.get(message.profileId) },
+    }));
     const oldest = items[0];
     return NextResponse.json({
-      items,
+      items: decoratedItems,
       nextCursor: hasMore && oldest
         ? encodeMessageCursor({ id: oldest.id, createdAt: oldest.createdAt.toISOString() })
         : null,

@@ -28,11 +28,15 @@ test("owner creates, edits, assigns, revokes, and removes a custom role", async 
 
   await page.goto(`/dashboard/spaces/${space.id}/roles`);
   await page.getByLabel("Role name").fill("Moderators");
+  await page.getByLabel("Color").first().fill("#ff0000");
+  await page.getByLabel("Badge").first().selectOption("moderator");
+  await page.getByLabel("Display position").first().fill("5");
   await page.getByLabel("KICK_MEMBERS", { exact: true }).first().check();
   await page.getByRole("button", { name: "Create role" }).click();
 
   const roleCard = page.getByRole("article").filter({ hasText: "Moderators" });
   await expect(roleCard).toBeVisible();
+  await expect(roleCard.getByLabel("moderator badge")).toBeVisible();
   await roleCard.getByLabel("RBAC Member").check();
   await expect.poll(async () => {
     const response = await page.request.get(`/api/spaces/${space.id}/roles`);
@@ -40,16 +44,22 @@ test("owner creates, edits, assigns, revokes, and removes a custom role", async 
     return payload.roles[0]?.memberships.length;
   }).toBe(1);
 
-  await roleCard.getByLabel("MANAGE_CHANNELS", { exact: true }).check();
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "View members" }).click();
+  await expect(page.getByLabel("Moderators role, moderator badge")).toBeVisible();
+  await page.goto(`/dashboard/spaces/${space.id}/roles`);
+  const refreshedRoleCard = page.getByRole("article").filter({ hasText: "Moderators" });
+
+  await refreshedRoleCard.getByLabel("MANAGE_CHANNELS", { exact: true }).check();
   await expect.poll(async () => {
     const response = await page.request.get(`/api/spaces/${space.id}/roles`);
     const payload = await response.json();
     return payload.roles[0]?.permissions.map((item: { permission: string }) => item.permission).sort();
   }).toEqual(["KICK_MEMBERS", "MANAGE_CHANNELS"]);
 
-  await roleCard.getByLabel("RBAC Member").uncheck();
-  await roleCard.getByRole("button", { name: "Delete role" }).click();
-  await expect(roleCard).toHaveCount(0);
+  await refreshedRoleCard.getByLabel("RBAC Member").uncheck();
+  await refreshedRoleCard.getByRole("button", { name: "Delete role" }).click();
+  await expect(refreshedRoleCard).toHaveCount(0);
   const details = await page.request.get(`/api/spaces/${space.id}`);
   expect((await details.json()).members.some((member: { profile: { username: string } }) => member.profile.username === "rbac_member")).toBe(true);
   await memberContext.close();
