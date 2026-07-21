@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import type { PresenceSnapshot } from "@/lib/events";
+import { getSoundEffects } from "@/lib/browser-sound-effects";
+import { resolveMessageSound } from "@/lib/sound-effects";
 import { useAppStore, type RealtimeMessage } from "@/store/useAppStore";
+import { useSoundEffectsUnlock } from "@/hooks/useSoundEffectsUnlock";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -57,6 +60,8 @@ export const useRealtime = () => {
     addMessage,
     setPresenceUsers,
   } = useAppStore();
+  const activeChannelId = useAppStore((state) => state.activeChannelId);
+  useSoundEffectsUnlock();
 
   // Subscribe to every text channel so inactive-channel messages become unread.
   useEffect(() => {
@@ -75,7 +80,18 @@ export const useRealtime = () => {
       eventSource.onmessage = (event) => {
         try {
           const message = parseMessageEvent(event.data, channelId);
-          if (message) addMessage(message);
+          if (message) {
+            if (!("_type" in message)) {
+              const sound = resolveMessageSound({
+                authoredBySelf: message.profileId === profile?.id,
+                activeChannel: message.channelId === activeChannelId,
+                // #28 supplies structured recipient semantics; never parse message prose here.
+                targetedMention: false,
+              });
+              if (sound) getSoundEffects()?.emit(sound);
+            }
+            addMessage(message);
+          }
         } catch (error) {
           console.error("Failed to parse message SSE payload:", error);
         }
@@ -87,7 +103,7 @@ export const useRealtime = () => {
     return () => {
       eventSources.forEach((eventSource) => eventSource.close());
     };
-  }, [activeSpaceId, addMessage, channels]);
+  }, [activeChannelId, activeSpaceId, addMessage, channels, profile?.id]);
 
   // The authenticated SSE connection itself represents local presence.
   useEffect(() => {

@@ -9,6 +9,7 @@ import {
   RemoteParticipant,
 } from "livekit-client";
 import { useAppStore } from "@/store/useAppStore";
+import { getSoundEffects } from "@/lib/browser-sound-effects";
 import { Mic, MicOff, Video, VideoOff, Monitor, PhoneOff, ChevronUp, ChevronDown } from "lucide-react";
 
 export default function VoiceGrid() {
@@ -38,6 +39,7 @@ export default function VoiceGrid() {
   });
   const [audioBlocked, setAudioBlocked] = useState(false);
   const roomRef = useRef<Room | null>(null);
+  const muteInitializedRef = useRef(false);
   const localVideoRef = useRef<HTMLDivElement>(null);
   const remoteVideoRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const canPublish = getCanPublish(livekitToken);
@@ -61,8 +63,14 @@ export default function VoiceGrid() {
       setRemoteParticipants(Array.from(room.remoteParticipants.values()));
     };
 
-    room.on(RoomEvent.ParticipantConnected, syncParticipants);
-    room.on(RoomEvent.ParticipantDisconnected, syncParticipants);
+    room.on(RoomEvent.ParticipantConnected, () => {
+      syncParticipants();
+      getSoundEffects()?.emit("REMOTE_JOINED");
+    });
+    room.on(RoomEvent.ParticipantDisconnected, () => {
+      syncParticipants();
+      getSoundEffects()?.emit("REMOTE_LEFT");
+    });
     room.on(RoomEvent.TrackSubscribed, syncParticipants);
     room.on(RoomEvent.TrackUnsubscribed, syncParticipants);
     room.on(RoomEvent.TrackMuted, syncParticipants);
@@ -106,6 +114,7 @@ export default function VoiceGrid() {
         setLocalParticipantSid(room.localParticipant.sid);
         setAudioBlocked(!room.canPlaybackAudio);
         syncParticipants();
+        getSoundEffects()?.emit("LOCAL_CONNECTED");
       } catch (error: unknown) {
         if (disposed) return;
         console.error("LiveKit connection error:", error);
@@ -118,9 +127,13 @@ export default function VoiceGrid() {
 
     return () => {
       disposed = true;
+      if (room.state === ConnectionState.Connected) {
+        getSoundEffects()?.emit("LOCAL_DISCONNECTED");
+      }
       room.removeAllListeners();
       room.disconnect();
       roomRef.current = null;
+      muteInitializedRef.current = false;
     };
   }, [livekitToken, activeVoiceChannelId, wsUrl]);
 
@@ -128,9 +141,12 @@ export default function VoiceGrid() {
   useEffect(() => {
     const room = roomRef.current;
     if (!room || connectionState !== ConnectionState.Connected || !canPublish) return;
-    room.localParticipant.setMicrophoneEnabled(!isMuted).catch((e) =>
-      console.warn("Mic toggle error:", e.message)
-    );
+    room.localParticipant.setMicrophoneEnabled(!isMuted).then(() => {
+      if (muteInitializedRef.current) {
+        getSoundEffects()?.emit(isMuted ? "LOCAL_MUTED" : "LOCAL_UNMUTED");
+      }
+      muteInitializedRef.current = true;
+    }).catch((e) => console.warn("Mic toggle error:", e.message));
   }, [canPublish, connectionState, isMuted]);
 
   // ── Camera toggle ─────────────────────────────────────────────────────────
