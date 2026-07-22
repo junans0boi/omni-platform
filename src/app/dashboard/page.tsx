@@ -18,7 +18,7 @@ import { FriendsPanel } from "@/components/FriendsPanel";
 import { ChannelHeaderExtras } from "@/components/ChannelHeaderExtras";
 import { NotificationDrawer } from "@/components/NotificationDrawer";
 import { getSoundEffects } from "@/lib/browser-sound-effects";
-import { DEFAULT_SOUND_PREFERENCE, type SoundPreference } from "@/lib/sound-effects";
+import { DEFAULT_SOUND_PREFERENCE } from "@/lib/sound-effects";
 import { readSoundPreference } from "@/lib/sound-preference-storage";
 import type { MentionDraft } from "@/lib/mentions";
 import { useI18n } from "@/i18n/I18nProvider";

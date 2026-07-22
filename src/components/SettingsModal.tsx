@@ -48,10 +48,10 @@ export function SettingsModal({
   // Account State
   const [username, setUsername] = useState(profile?.username || "junansOboi");
   const [isEditingUsername, setIsEditingUsername] = useState(false);
-  const [email, setEmail] = useState("junansOboi@gmail.com");
+  const [email] = useState("junansOboi@gmail.com");
   const [showEmail, setShowEmail] = useState(false);
   const [isEditingEmail, setIsEditingEmail] = useState(false);
-  const [phone, setPhone] = useState("01012346854");
+  const [phone] = useState("01012346854");
   const [showPhone, setShowPhone] = useState(false);
   const [isEditingPhone, setIsEditingPhone] = useState(false);
 
