@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { can } from "@/lib/rbac";
 
 // POST /api/spaces/[id]/channels — Create a new channel
 export async function POST(
@@ -16,8 +15,22 @@ export async function POST(
   const { id: spaceId } = await params;
 
   try {
-    if (!(await can(user.id, spaceId, "MANAGE_CHANNELS"))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const space = await prisma.space.findUnique({
+      where: { id: spaceId },
+      select: { id: true, ownerId: true },
+    });
+
+    if (!space) {
+      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+    }
+
+    // Check membership in the space
+    const membership = await prisma.member.findUnique({
+      where: { spaceId_profileId: { spaceId, profileId: user.id } },
+    });
+
+    if (!membership && space.ownerId !== user.id) {
+      return NextResponse.json({ error: "Forbidden: You are not a member of this space" }, { status: 403 });
     }
 
     const { name, type, categoryId, mode } = await req.json();

@@ -315,13 +315,31 @@ export function SettingsModal({
     setIsEditingPhone(!isEditingPhone);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md transition-all animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md transition-all animate-fadeIn">
       {/* Modal Container */}
-      <div className="relative flex h-[680px] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/15 bg-zinc-950/95 text-white shadow-2xl backdrop-blur-2xl">
-        
+      <div className="relative flex h-[90vh] max-h-[700px] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/15 bg-zinc-950/95 text-white shadow-2xl backdrop-blur-2xl">
+        {/* Fixed Top Right Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-zinc-900/90 text-zinc-300 shadow-xl transition hover:bg-rose-600 hover:border-rose-500 hover:text-white"
+          title="닫기 (Esc)"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
         {/* Left Navigation Sidebar */}
         <div className="w-64 shrink-0 border-r border-white/10 bg-white/[0.03] p-5 flex flex-col justify-between select-none">
           <div>
@@ -415,15 +433,7 @@ export function SettingsModal({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 p-6 md:p-8 overflow-y-auto relative no-scrollbar">
-          {/* Top Close Button */}
-          <button
-            onClick={onClose}
-            className="absolute top-6 right-6 flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
-          >
-            <X className="h-4 w-4" />
-          </button>
-
+        <div className="flex-1 p-6 md:p-8 overflow-y-auto relative no-scrollbar pr-14">
           {/* TAB 1: Account (계정 정보 & 보안 & 연결) */}
           {activeTab === "account" && (
             <div className="space-y-6">
