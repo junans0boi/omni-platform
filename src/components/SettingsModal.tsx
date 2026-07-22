@@ -48,10 +48,10 @@ export function SettingsModal({
   // Account State
   const [username, setUsername] = useState(profile?.username || "junansOboi");
   const [isEditingUsername, setIsEditingUsername] = useState(false);
-  const [email] = useState("junansOboi@gmail.com");
+  const [email, setEmail] = useState("junansOboi@gmail.com");
   const [showEmail, setShowEmail] = useState(false);
   const [isEditingEmail, setIsEditingEmail] = useState(false);
-  const [phone] = useState("01012346854");
+  const [phone, setPhone] = useState("01012346854");
   const [showPhone, setShowPhone] = useState(false);
   const [isEditingPhone, setIsEditingPhone] = useState(false);
 
@@ -438,7 +438,7 @@ export function SettingsModal({
                   <div>
                     <span className="text-xs text-zinc-400 block">전화번호</span>
                     <span className="text-sm font-bold text-white tracking-wide">
-                      {showPhone ? "010-1234-6854" : "*********6854"}
+                      {showPhone ? phone : "*********6854"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">

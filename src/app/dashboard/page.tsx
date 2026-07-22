@@ -19,7 +19,7 @@ import { ChannelHeaderExtras } from "@/components/ChannelHeaderExtras";
 import { NotificationDrawer } from "@/components/NotificationDrawer";
 import { getSoundEffects } from "@/lib/browser-sound-effects";
 import { DEFAULT_SOUND_PREFERENCE, type SoundPreference } from "@/lib/sound-effects";
-import { readSoundPreference, writeSoundPreference } from "@/lib/sound-preference-storage";
+import { readSoundPreference } from "@/lib/sound-preference-storage";
 import type { MentionDraft } from "@/lib/mentions";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useBoundedVirtualList } from "@/hooks/useBoundedVirtualList";
@@ -136,10 +136,6 @@ export default function DashboardPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
-  const [soundPreferenceOverride, setSoundPreferenceOverride] = useState<{
-    profileId: string;
-    value: SoundPreference;
-  } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ type: "channel" | "category"; id: string; x: number; y: number; name: string } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -151,13 +147,10 @@ export default function DashboardPage() {
       : { ...DEFAULT_SOUND_PREFERENCE },
     [profile],
   );
-  const soundPreference = profile && soundPreferenceOverride?.profileId === profile.id
-    ? soundPreferenceOverride.value
-    : storedSoundPreference;
 
   useEffect(() => {
-    getSoundEffects()?.setPreference(soundPreference);
-  }, [soundPreference]);
+    getSoundEffects()?.setPreference(storedSoundPreference);
+  }, [storedSoundPreference]);
 
   useEffect(() => {
     setTheme("dark");
