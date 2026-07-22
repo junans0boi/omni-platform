@@ -160,7 +160,9 @@ export function SettingsModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    fetchUserPreferences();
+    const timer = setTimeout(() => {
+      fetchUserPreferences();
+    }, 0);
 
     if (typeof navigator !== "undefined" && navigator.mediaDevices?.enumerateDevices) {
       navigator.mediaDevices
@@ -178,6 +180,8 @@ export function SettingsModal({
         })
         .catch(() => {});
     }
+
+    return () => clearTimeout(timer);
   }, [isOpen, fetchUserPreferences, selectedMic, selectedSpeaker, selectedCamera]);
 
   // Mic test simulation timer
@@ -559,7 +563,11 @@ export function SettingsModal({
                   <input
                     type="checkbox"
                     checked={pcNotification}
-                    onChange={(e) => setPcNotification(e.target.checked)}
+                    onChange={(e) => {
+                      const v = e.target.checked;
+                      setPcNotification(v);
+                      updatePreference({ pcNotification: v });
+                    }}
                     className="h-5 w-5 rounded-md border-white/10 bg-indigo-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                   />
                 </label>
@@ -679,7 +687,6 @@ export function SettingsModal({
                   />
                 </div>
 
-                {/* 모든 알림 소리 비활성화 */}
                 <label className="flex items-start justify-between cursor-pointer pt-2">
                   <div className="pr-4">
                     <span className="text-xs font-bold text-rose-400 block">모든 알림 소리 비활성화</span>
@@ -690,7 +697,11 @@ export function SettingsModal({
                   <input
                     type="checkbox"
                     checked={disableAllSounds}
-                    onChange={(e) => setDisableAllSounds(e.target.checked)}
+                    onChange={(e) => {
+                      const v = e.target.checked;
+                      setDisableAllSounds(v);
+                      updatePreference({ disableAllSounds: v });
+                    }}
                     className="h-5 w-5 shrink-0 rounded border-white/10 bg-rose-600 cursor-pointer mt-1"
                   />
                 </label>
@@ -993,7 +1004,10 @@ export function SettingsModal({
                       name="timeFormat"
                       value="auto"
                       checked={timeFormat === "auto"}
-                      onChange={() => setTimeFormat("auto")}
+                      onChange={() => {
+                        setTimeFormat("auto");
+                        updatePreference({ timeFormat: "auto" });
+                      }}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-xs font-semibold text-white">자동 (시스템 기본값)</span>
@@ -1005,7 +1019,10 @@ export function SettingsModal({
                       name="timeFormat"
                       value="12h"
                       checked={timeFormat === "12h"}
-                      onChange={() => setTimeFormat("12h")}
+                      onChange={() => {
+                        setTimeFormat("12h");
+                        updatePreference({ timeFormat: "12h" });
+                      }}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-xs font-semibold text-white">12시간 (오후 2:30)</span>
@@ -1017,7 +1034,10 @@ export function SettingsModal({
                       name="timeFormat"
                       value="24h"
                       checked={timeFormat === "24h"}
-                      onChange={() => setTimeFormat("24h")}
+                      onChange={() => {
+                        setTimeFormat("24h");
+                        updatePreference({ timeFormat: "24h" });
+                      }}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-xs font-semibold text-white">24시간 (14:30)</span>

@@ -159,17 +159,6 @@ export default function DashboardPage() {
     getSoundEffects()?.setPreference(soundPreference);
   }, [soundPreference]);
 
-  const updateSoundPreference = (preference: SoundPreference) => {
-    if (profile) setSoundPreferenceOverride({ profileId: profile.id, value: preference });
-    getSoundEffects()?.setPreference(preference);
-    if (!profile || typeof window === "undefined") return;
-    try {
-      writeSoundPreference(profile.id, preference, window.localStorage);
-    } catch {
-      // Effects remain usable in memory when browser storage is unavailable.
-    }
-  };
-
   useEffect(() => {
     setTheme("dark");
     document.documentElement.classList.add("dark");
