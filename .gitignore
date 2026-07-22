@@ -36,10 +36,12 @@ yarn-error.log*
 .env*
 
 # local SQLite data
-/prisma/*.db
-/prisma/*.db-*
-/prisma/*.db.*
+**/*.db
+**/*.db-*
+**/*.db.*
 /public/uploads/
+logs/
+*.log
 
 # vercel
 .vercel
