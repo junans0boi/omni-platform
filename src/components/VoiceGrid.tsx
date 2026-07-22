@@ -215,6 +215,8 @@ export default function VoiceGrid() {
     };
   }, [livekitToken, activeVoiceChannelId, wsUrl]);
 
+  const screenShareInitRef = useRef(false);
+
   // ── Mic toggle ────────────────────────────────────────────────────────────
   useEffect(() => {
     const room = roomRef.current;
@@ -240,7 +242,12 @@ export default function VoiceGrid() {
   useEffect(() => {
     const room = roomRef.current;
     if (!room || connectionState !== ConnectionState.Connected || !canPublish) return;
-    room.localParticipant.setScreenShareEnabled(isScreenSharing).catch((e) =>
+    room.localParticipant.setScreenShareEnabled(isScreenSharing).then(() => {
+      if (screenShareInitRef.current) {
+        getSoundEffects()?.emit(isScreenSharing ? "SCREEN_SHARE_STARTED" : "SCREEN_SHARE_STOPPED");
+      }
+      screenShareInitRef.current = true;
+    }).catch((e) =>
       console.warn("Screen share error:", e.message)
     );
   }, [canPublish, connectionState, isScreenSharing]);
