@@ -500,7 +500,7 @@ export function SettingsModal({
                       />
                     ) : (
                       <span className="text-sm font-bold text-white tracking-wide">
-                        {showEmail ? email : "**********@gmail.com"}
+                        {showEmail ? email : email ? "*".repeat(email.length) : "등록되지 않음"}
                       </span>
                     )}
                   </div>
@@ -535,7 +535,7 @@ export function SettingsModal({
                       />
                     ) : (
                       <span className="text-sm font-bold text-white tracking-wide">
-                        {showPhone ? phone : "*********6854"}
+                        {showPhone ? phone : phone ? "*".repeat(phone.length) : "등록되지 않음"}
                       </span>
                     )}
                   </div>
