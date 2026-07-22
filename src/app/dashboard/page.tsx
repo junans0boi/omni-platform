@@ -606,35 +606,44 @@ export default function DashboardPage() {
     await fetchSpaces(); setActiveSpaceId(null);
   };
 
+  const sendingChannelMessageRef = useRef(false);
+
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!activeChannelId) return;
+    if (sendingChannelMessageRef.current || !activeChannelId) return;
     
     let content = messageInput.trim();
-    if (pendingFile) {
-      const fd = new FormData(); fd.append("file", pendingFile);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
-      if (res.ok) content = content ? `${content}\n![image](${(await res.json()).url})` : `![image](${(await res.json()).url})`;
-      setPendingFile(null); setImagePreview(null);
-    }
-    if (!content) return;
-    const mentions: MentionDraft[] = [];
-    if (/(^|\s)@everyone\b/i.test(content)) mentions.push({ kind: "EVERYONE" });
-    if (/(^|\s)@here\b/i.test(content)) mentions.push({ kind: "HERE" });
-    for (const member of members) {
-      const username = member.profile?.username;
-      if (username && new RegExp(`(^|\\s)@${username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(content)) {
-        mentions.push({ kind: "PROFILE", profileId: member.profileId });
-      }
-    }
-    
+    if (!content && !pendingFile) return;
+
+    sendingChannelMessageRef.current = true;
+    setMessageInput("");
+
     try {
+      if (pendingFile) {
+        const fd = new FormData(); fd.append("file", pendingFile);
+        const res = await fetch("/api/upload", { method: "POST", body: fd });
+        if (res.ok) content = content ? `${content}\n![image](${(await res.json()).url})` : `![image](${(await res.json()).url})`;
+        setPendingFile(null); setImagePreview(null);
+      }
+      if (!content) return;
+
+      const mentions: MentionDraft[] = [];
+      if (/(^|\s)@everyone\b/i.test(content)) mentions.push({ kind: "EVERYONE" });
+      if (/(^|\s)@here\b/i.test(content)) mentions.push({ kind: "HERE" });
+      for (const member of members) {
+        const username = member.profile?.username;
+        if (username && new RegExp(`(^|\\s)@${username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(content)) {
+          mentions.push({ kind: "PROFILE", profileId: member.profileId });
+        }
+      }
+      
       await sendMessage(activeChannelId, content, replyToId, mentions);
-      setMessageInput("");
       setReplyToId(null);
       setActionError(null);
     } catch (error: unknown) {
       setActionError(getErrorMessage(error, "Failed to send message"));
+    } finally {
+      sendingChannelMessageRef.current = false;
     }
   };
 
@@ -695,7 +704,11 @@ export default function DashboardPage() {
         setMentionQuery(null);
       }
     } else {
-      if (e.key === "Enter") handleSendMessage();
+      if (e.nativeEvent.isComposing) return;
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSendMessage();
+      }
     }
   };
 

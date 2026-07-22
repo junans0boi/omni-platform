@@ -294,17 +294,20 @@ export function useFriendsAndDms() {
     setFilePreview(null);
   };
 
-  const handleSendDm = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if ((!dmInput.trim() && !pendingFile) || !activeConversationId) return;
+  const handleSendDm = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (sendingDm || (!dmInput.trim() && !pendingFile) || !activeConversationId) return;
 
-    let content = dmInput.trim();
     setSendingDm(true);
+    let content = dmInput.trim();
+    const currentPendingFile = pendingFile;
+    setDmInput("");
+    clearPendingFile();
 
     try {
-      if (pendingFile) {
+      if (currentPendingFile) {
         const formData = new FormData();
-        formData.append("file", pendingFile);
+        formData.append("file", currentPendingFile);
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
         if (uploadRes.ok) {
           const uploadData = await uploadRes.json();
@@ -314,9 +317,6 @@ export function useFriendsAndDms() {
           content = content ? `${content}\n${fileTag}` : fileTag;
         }
       }
-
-      setDmInput("");
-      clearPendingFile();
 
       const res = await fetch(`/api/dm/${activeConversationId}/messages`, {
         method: "POST",

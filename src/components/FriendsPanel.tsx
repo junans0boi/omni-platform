@@ -201,6 +201,13 @@ export function FriendsPanel({
               type="text"
               value={dmInput}
               onChange={(e) => setDmInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing) return;
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendDm(e);
+                }
+              }}
               placeholder="1:1 메시지 전송..."
               className="flex-1 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-text placeholder-muted outline-none transition focus:border-accent"
             />
