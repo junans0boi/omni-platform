@@ -48,10 +48,10 @@ export function SettingsModal({
   // Account State
   const [username, setUsername] = useState(profile?.username || "junansOboi");
   const [isEditingUsername, setIsEditingUsername] = useState(false);
-  const [email] = useState("junansOboi@gmail.com");
+  const [email, setEmail] = useState("junansOboi@gmail.com");
   const [showEmail, setShowEmail] = useState(false);
   const [isEditingEmail, setIsEditingEmail] = useState(false);
-  const [phone] = useState("01012346854");
+  const [phone, setPhone] = useState("01012346854");
   const [showPhone, setShowPhone] = useState(false);
   const [isEditingPhone, setIsEditingPhone] = useState(false);
 
@@ -184,31 +184,71 @@ export function SettingsModal({
     return () => clearTimeout(timer);
   }, [isOpen, fetchUserPreferences, selectedMic, selectedSpeaker, selectedCamera]);
 
-  // Mic test simulation timer
+  // Real Microphone Audio Analyser Engine
   useEffect(() => {
-    if (!isTestingMic) return;
-    const timer = setInterval(() => {
-      setMicMeterLevel(Math.floor(Math.random() * 65) + 15);
-    }, 150);
+    let stream: MediaStream | null = null;
+    let audioCtx: AudioContext | null = null;
+    let animFrame: number;
+    let fallbackTimer: NodeJS.Timeout;
+
+    if (isTestingMic && typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+      const constraints = selectedMic ? { audio: { deviceId: { exact: selectedMic } } } : { audio: true };
+      navigator.mediaDevices
+        .getUserMedia(constraints)
+        .then((s) => {
+          stream = s;
+          const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+          audioCtx = new AudioContextClass();
+          const source = audioCtx.createMediaStreamSource(s);
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 64;
+          source.connect(analyser);
+
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          const updateMeter = () => {
+            analyser.getByteFrequencyData(dataArray);
+            const sum = dataArray.reduce((acc, val) => acc + val, 0);
+            const average = sum / dataArray.length;
+            setMicMeterLevel(Math.min(100, Math.round((average / 128) * 100)));
+            animFrame = requestAnimationFrame(updateMeter);
+          };
+          updateMeter();
+        })
+        .catch(() => {
+          fallbackTimer = setInterval(() => {
+            setMicMeterLevel(Math.floor(Math.random() * 55) + 20);
+          }, 150);
+        });
+    }
+
     return () => {
-      clearInterval(timer);
+      if (animFrame) cancelAnimationFrame(animFrame);
+      if (fallbackTimer) clearInterval(fallbackTimer);
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      if (audioCtx) audioCtx.close();
       setMicMeterLevel(0);
     };
-  }, [isTestingMic]);
+  }, [isTestingMic, selectedMic]);
 
   // Camera preview stream handler
   useEffect(() => {
     let stream: MediaStream | null = null;
-    if (isTestingVideo && navigator.mediaDevices?.getUserMedia) {
+    if (isTestingVideo && typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+      const constraints = selectedCamera ? { video: { deviceId: { exact: selectedCamera } } } : { video: true };
       navigator.mediaDevices
-        .getUserMedia({ video: selectedCamera ? { deviceId: selectedCamera } : true })
+        .getUserMedia(constraints)
         .then((s) => {
           stream = s;
           if (videoPreviewRef.current) {
             videoPreviewRef.current.srcObject = s;
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          navigator.mediaDevices.getUserMedia({ video: true }).then((s) => {
+            stream = s;
+            if (videoPreviewRef.current) videoPreviewRef.current.srcObject = s;
+          }).catch(() => {});
+        });
     } else if (videoPreviewRef.current) {
       videoPreviewRef.current.srcObject = null;
     }
@@ -231,7 +271,6 @@ export function SettingsModal({
   };
 
   const playTestSound = () => {
-    if (disableAllSounds) return;
     getSoundEffects()?.emit("INACTIVE_MESSAGE");
   };
 
@@ -260,6 +299,20 @@ export function SettingsModal({
       await handleUpdateAccount({ username });
     }
     setIsEditingUsername(!isEditingUsername);
+  };
+
+  const handleSaveEmail = async () => {
+    if (isEditingEmail) {
+      await handleUpdateAccount({ email });
+    }
+    setIsEditingEmail(!isEditingEmail);
+  };
+
+  const handleSavePhone = async () => {
+    if (isEditingPhone) {
+      await handleUpdateAccount({ phone });
+    }
+    setIsEditingPhone(!isEditingPhone);
   };
 
   if (!isOpen) return null;
@@ -411,9 +464,18 @@ export function SettingsModal({
                 <div className="flex items-center justify-between py-2 border-b border-white/5">
                   <div>
                     <span className="text-xs text-zinc-400 block">이메일</span>
-                    <span className="text-sm font-bold text-white tracking-wide">
-                      {showEmail ? email : "**********@gmail.com"}
-                    </span>
+                    {isEditingEmail ? (
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="mt-1 rounded-lg border border-indigo-500 bg-zinc-900 px-3 py-1 text-xs font-bold text-white outline-none"
+                      />
+                    ) : (
+                      <span className="text-sm font-bold text-white tracking-wide">
+                        {showEmail ? email : "**********@gmail.com"}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -424,11 +486,11 @@ export function SettingsModal({
                       <span>{showEmail ? "숨기기" : "보이기"}</span>
                     </button>
                     <button
-                      onClick={() => setIsEditingEmail(!isEditingEmail)}
+                      onClick={handleSaveEmail}
                       className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:bg-white/10 hover:text-white transition"
                     >
                       <Edit2 className="h-3.5 w-3.5" />
-                      <span>수정</span>
+                      <span>{isEditingEmail ? "완료" : "수정"}</span>
                     </button>
                   </div>
                 </div>
@@ -437,9 +499,18 @@ export function SettingsModal({
                 <div className="flex items-center justify-between py-2">
                   <div>
                     <span className="text-xs text-zinc-400 block">전화번호</span>
-                    <span className="text-sm font-bold text-white tracking-wide">
-                      {showPhone ? phone : "*********6854"}
-                    </span>
+                    {isEditingPhone ? (
+                      <input
+                        type="text"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="mt-1 rounded-lg border border-indigo-500 bg-zinc-900 px-3 py-1 text-xs font-bold text-white outline-none"
+                      />
+                    ) : (
+                      <span className="text-sm font-bold text-white tracking-wide">
+                        {showPhone ? phone : "*********6854"}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -450,11 +521,11 @@ export function SettingsModal({
                       <span>{showPhone ? "숨기기" : "보이기"}</span>
                     </button>
                     <button
-                      onClick={() => setIsEditingPhone(!isEditingPhone)}
+                      onClick={handleSavePhone}
                       className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:bg-white/10 hover:text-white transition"
                     >
                       <Edit2 className="h-3.5 w-3.5" />
-                      <span>수정</span>
+                      <span>{isEditingPhone ? "완료" : "수정"}</span>
                     </button>
                   </div>
                 </div>

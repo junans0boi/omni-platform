@@ -749,9 +749,7 @@ export default function DashboardPage() {
                 >
                   {copiedInvite ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                 </button>
-                {isAdminOrOwner && (
-                  <button onClick={() => openModal("createChannel")} title={t("dialog.createChannel")} className="rounded-lg p-1 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"><Plus className="h-3.5 w-3.5" /></button>
-                )}
+                <button onClick={() => openModal("createChannel")} title={t("dialog.createChannel")} className="rounded-lg p-1 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"><Plus className="h-3.5 w-3.5" /></button>
                 {myMember?.role === "OWNER" ? (
                   <button onClick={handleDeleteSpace} title={t("dashboard.deleteSpace")} className="rounded-lg p-1 text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
                 ) : myMember ? (
@@ -761,6 +759,15 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-2 py-3 space-y-3 no-scrollbar">
+              {/* Quick Channel Create Button */}
+              <button
+                onClick={() => openModal("createChannel")}
+                className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-600/10 px-3 py-2 text-xs font-extrabold text-indigo-300 transition hover:bg-indigo-600/20 hover:text-indigo-200 shadow-sm"
+              >
+                <Plus className="h-4 w-4" />
+                <span>채널 생성 (자유 / 회의 / 강의 모드)</span>
+              </button>
+
               {/* Channel List & Empty Fallbacks */}
               {(() => {
                 const validCatIds = new Set(categories.map((cat) => cat.id));
@@ -770,12 +777,10 @@ export default function DashboardPage() {
                   return (
                     <div className="flex flex-col items-center justify-center p-4 text-center mt-4 space-y-2">
                       <span className="text-xs text-zinc-500">채널이 아직 없습니다.</span>
-                      {isAdminOrOwner && (
-                        <button onClick={() => openModal("createChannel")} className="flex items-center gap-1 text-xs font-bold text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg border border-indigo-500/20 transition">
-                          <Plus className="h-3.5 w-3.5" />
-                          <span>채널 만들기</span>
-                        </button>
-                      )}
+                      <button onClick={() => openModal("createChannel")} className="flex items-center gap-1 text-xs font-bold text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg border border-indigo-500/20 transition">
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>채널 만들기</span>
+                      </button>
                     </div>
                   );
                 }
@@ -787,11 +792,9 @@ export default function DashboardPage() {
                       <div className="space-y-0.5">
                         <div className="flex items-center justify-between px-2 py-1">
                           <span className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-500">일반 채널 (General)</span>
-                          {isAdminOrOwner && (
-                            <button onClick={() => { setNewChannelCategoryId(""); openModal("createChannel"); }} title="채널 추가" className="text-zinc-500 hover:text-white transition">
-                              <Plus className="h-3 w-3" />
-                            </button>
-                          )}
+                          <button onClick={() => { setNewChannelCategoryId(""); openModal("createChannel"); }} title="채널 추가" className="text-zinc-500 hover:text-white transition">
+                            <Plus className="h-3 w-3" />
+                          </button>
                         </div>
                         {uncategorizedChannels.map((ch) => {
                           const isActive = ch.id === activeChannelId;
