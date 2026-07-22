@@ -11,6 +11,8 @@ export const safeProfileSelect = {
   avatarUrl: true,
   availability: true,
   customStatus: true,
+  email: true,
+  phone: true,
   createdAt: true,
   updatedAt: true,
 } as const;

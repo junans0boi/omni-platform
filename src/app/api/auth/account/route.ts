@@ -3,6 +3,21 @@ import { getSessionUser, safeProfileSelect } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/lib/password";
 
+// GET /api/auth/account — Fetch profile with email & phone
+export async function GET() {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const profile = await prisma.profile.findUnique({
+    where: { id: user.id },
+    select: safeProfileSelect,
+  });
+
+  return NextResponse.json({ user: profile });
+}
+
 // PATCH /api/auth/account — Update username, email, phone, or password
 export async function PATCH(req: NextRequest) {
   const user = await getSessionUser();

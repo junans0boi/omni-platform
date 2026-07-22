@@ -10,6 +10,8 @@ export interface Profile {
   avatarUrl: string | null;
   availability?: "AVAILABLE" | "IDLE" | "DND";
   customStatus?: string | null;
+  email?: string | null;
+  phone?: string | null;
   createdAt: string;
   displayRole?: DisplayRole;
 }

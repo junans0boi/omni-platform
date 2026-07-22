@@ -46,12 +46,12 @@ export function SettingsModal({
   const [activeTab, setActiveTab] = useState<NavTabKey>("account");
 
   // Account State
-  const [username, setUsername] = useState(profile?.username || "junansOboi");
+  const [username, setUsername] = useState(profile?.username || "");
   const [isEditingUsername, setIsEditingUsername] = useState(false);
-  const [email, setEmail] = useState("junansOboi@gmail.com");
+  const [email, setEmail] = useState(profile?.email || "");
   const [showEmail, setShowEmail] = useState(false);
   const [isEditingEmail, setIsEditingEmail] = useState(false);
-  const [phone, setPhone] = useState("01012346854");
+  const [phone, setPhone] = useState(profile?.phone || "");
   const [showPhone, setShowPhone] = useState(false);
   const [isEditingPhone, setIsEditingPhone] = useState(false);
 
@@ -163,6 +163,16 @@ export function SettingsModal({
 
     const timer = setTimeout(() => {
       fetchUserPreferences();
+      fetch("/api/auth/account")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.user) {
+            if (data.user.username) setUsername(data.user.username);
+            if (data.user.email) setEmail(data.user.email);
+            if (data.user.phone) setPhone(data.user.phone);
+          }
+        })
+        .catch(() => {});
     }, 0);
 
     if (typeof navigator !== "undefined" && navigator.mediaDevices?.enumerateDevices) {
