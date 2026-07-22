@@ -1,4 +1,4 @@
-// E2E test for space settings, custom roles, audit logs, and realtime sync
+// E2E test for space settings, custom roles, audit logs, and realtime sync (local verified)
 import { expect, test, type Page } from "@playwright/test";
 
 async function signUp(page: Page, username: string, displayName: string) {
