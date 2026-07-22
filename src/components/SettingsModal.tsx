@@ -84,6 +84,7 @@ export function SettingsModal({
   const [micVolume, setMicVolume] = useState<number>(80);
   const [speakerVolume, setSpeakerVolume] = useState<number>(85);
   const [isTestingMic, setIsTestingMic] = useState<boolean>(false);
+  const [micLoopback, setMicLoopback] = useState<boolean>(true);
   const [micMeterLevel, setMicMeterLevel] = useState<number>(0);
   const [inputProfile, setInputProfile] = useState<"isolation" | "studio" | "custom">("isolation");
   const [pushToTalk, setPushToTalk] = useState<boolean>(false);
@@ -184,7 +185,7 @@ export function SettingsModal({
     return () => clearTimeout(timer);
   }, [isOpen, fetchUserPreferences, selectedMic, selectedSpeaker, selectedCamera]);
 
-  // Real Microphone Audio Analyser Engine
+  // Real Microphone Audio Analyser Engine with Loopback Support
   useEffect(() => {
     let stream: MediaStream | null = null;
     let audioCtx: AudioContext | null = null;
@@ -203,6 +204,12 @@ export function SettingsModal({
           const analyser = audioCtx.createAnalyser();
           analyser.fftSize = 64;
           source.connect(analyser);
+
+          // Audio Loopback Node (allows user to hear own voice during test)
+          const loopbackGain = audioCtx.createGain();
+          loopbackGain.gain.setValueAtTime(micLoopback ? Math.max(0.05, micVolume / 100) : 0, audioCtx.currentTime);
+          source.connect(loopbackGain);
+          loopbackGain.connect(audioCtx.destination);
 
           const dataArray = new Uint8Array(analyser.frequencyBinCount);
           const updateMeter = () => {
@@ -228,7 +235,7 @@ export function SettingsModal({
       if (audioCtx) audioCtx.close();
       setMicMeterLevel(0);
     };
-  }, [isTestingMic, selectedMic]);
+  }, [isTestingMic, selectedMic, micLoopback, micVolume]);
 
   // Camera preview stream handler
   useEffect(() => {
@@ -869,10 +876,13 @@ export function SettingsModal({
                 {/* 마이크 테스트 & 레벨 메터 */}
                 <div className="p-4 rounded-xl border border-white/10 bg-zinc-900/60 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">마이크 테스트</span>
+                    <div>
+                      <span className="text-xs font-bold text-white block">마이크 테스트</span>
+                      <span className="text-[11px] text-zinc-400">마이크에 말을 하여 입력 음량을 확인하고 스피커/헤드폰으로 내 목소리를 직접 들어보세요.</span>
+                    </div>
                     <button
                       onClick={() => setIsTestingMic(!isTestingMic)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${
                         isTestingMic
                           ? "bg-rose-600 text-white shadow-md"
                           : "bg-indigo-600 hover:bg-indigo-500 text-white"
@@ -888,6 +898,23 @@ export function SettingsModal({
                       className="h-full bg-gradient-to-r from-emerald-500 via-indigo-500 to-purple-500 rounded-full transition-all duration-150"
                       style={{ width: `${micMeterLevel}%` }}
                     />
+                  </div>
+
+                  {/* Audio Loopback Toggle */}
+                  <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                    <div className="flex items-center gap-2">
+                      <Volume2 className="h-3.5 w-3.5 text-indigo-400" />
+                      <span className="text-xs font-semibold text-zinc-300">내 목소리 직접 듣기 (오디오 루프백)</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={micLoopback}
+                        onChange={(e) => setMicLoopback(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
                   </div>
                 </div>
 
