@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { getSoundEffects } from "@/lib/browser-sound-effects";
 import type { Profile } from "@/store/useAppStore";
@@ -12,7 +12,6 @@ import {
   Mic,
   Video,
   Globe,
-  Clock,
   Code,
   LogOut,
   Eye,
@@ -24,8 +23,6 @@ import {
   HelpCircle,
   Sparkles,
   Sliders,
-  ExternalLink,
-  Radio,
 } from "lucide-react";
 
 interface SettingsModalProps {
@@ -45,16 +42,16 @@ export function SettingsModal({
   onProfileUpdate,
   onLogout,
 }: SettingsModalProps) {
-  const { locale, t } = useI18n();
+  const { locale } = useI18n();
   const [activeTab, setActiveTab] = useState<NavTabKey>("account");
 
   // Account State
   const [username, setUsername] = useState(profile?.username || "junansOboi");
   const [isEditingUsername, setIsEditingUsername] = useState(false);
-  const [email, setEmail] = useState("junansOboi@gmail.com");
+  const [email] = useState("junansOboi@gmail.com");
   const [showEmail, setShowEmail] = useState(false);
   const [isEditingEmail, setIsEditingEmail] = useState(false);
-  const [phone, setPhone] = useState("01012346854");
+  const [phone] = useState("01012346854");
   const [showPhone, setShowPhone] = useState(false);
   const [isEditingPhone, setIsEditingPhone] = useState(false);
 
@@ -97,9 +94,6 @@ export function SettingsModal({
   // Language & Time State
   const [timeFormat, setTimeFormat] = useState<"auto" | "12h" | "24h">("auto");
 
-  // Profile Save Message
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
-
   // Enumerate media devices
   useEffect(() => {
     if (!isOpen) return;
@@ -123,15 +117,14 @@ export function SettingsModal({
 
   // Mic test simulation timer
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (isTestingMic) {
-      timer = setInterval(() => {
-        setMicMeterLevel(Math.floor(Math.random() * 65) + 15);
-      }, 150);
-    } else {
+    if (!isTestingMic) return;
+    const timer = setInterval(() => {
+      setMicMeterLevel(Math.floor(Math.random() * 65) + 15);
+    }, 150);
+    return () => {
+      clearInterval(timer);
       setMicMeterLevel(0);
-    }
-    return () => clearInterval(timer);
+    };
   }, [isTestingMic]);
 
   // Camera preview stream handler
@@ -531,7 +524,7 @@ export function SettingsModal({
                     <span className="text-xs font-medium text-zinc-300">누군가가 내 메시지에 반응해요</span>
                     <select
                       value={reactionNotification}
-                      onChange={(e) => setReactionNotification(e.target.value as any)}
+                      onChange={(e) => setReactionNotification(e.target.value as "all" | "mentions" | "none")}
                       className="rounded-lg border border-white/10 bg-zinc-900 px-3 py-1 text-xs text-white outline-none focus:border-indigo-500"
                     >
                       <option value="all">모든 메시지</option>

@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
 
 export default function Home() {
-  const router = useRouter();
   const { t } = useI18n();
 
   useEffect(() => {
