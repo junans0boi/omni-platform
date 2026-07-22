@@ -9,7 +9,7 @@ import { getErrorMessage } from "@/lib/errors";
 import {
   Hash, Volume2, Plus, Compass, LogOut, Trash2, Copy, X, Send,
   Users, ChevronDown, ChevronRight, ChevronLeft, Edit2, Crown, Shield, UserMinus,
-  ImageIcon, Smile, PanelLeftClose, PanelLeft, Check, MessageSquare, Reply, Settings, UserPlus, Lock
+  ImageIcon, Smile, PanelLeftClose, PanelLeft, Check, MessageSquare, Reply, Settings, UserPlus, Lock, Paperclip
 } from "lucide-react";
 import VoiceGrid from "@/components/VoiceGrid";
 
@@ -622,7 +622,13 @@ export default function DashboardPage() {
       if (pendingFile) {
         const fd = new FormData(); fd.append("file", pendingFile);
         const res = await fetch("/api/upload", { method: "POST", body: fd });
-        if (res.ok) content = content ? `${content}\n![image](${(await res.json()).url})` : `![image](${(await res.json()).url})`;
+        if (res.ok) {
+          const uploadData = await res.json();
+          const fileTag = uploadData.isImage
+            ? `![${uploadData.originalName || "image"}](${uploadData.url})`
+            : `📎 [${uploadData.originalName || "file"}](${uploadData.url})`;
+          content = content ? `${content}\n${fileTag}` : fileTag;
+        }
         setPendingFile(null); setImagePreview(null);
       }
       if (!content) return;
@@ -735,28 +741,51 @@ export default function DashboardPage() {
   };
 
   const renderMessageContent = (content: string) => {
-    const imgMatch = content.match(/!\[.*?\]\((.*?)\)/);
-    const textContent = content.replace(/!\[.*?\]\((.*?)\)/g, "").trim();
-    
+    const imgMatch = content.match(/!\[(.*?)\]\((.*?)\)/);
+    const fileMatch = content.match(/📎 \[(.*?)\]\((.*?)\)/);
+    const textContent = content
+      .replace(/!\[(.*?)\]\((.*?)\)/g, "")
+      .replace(/📎 \[(.*?)\]\((.*?)\)/g, "")
+      .trim();
+
     return (
       <div className="space-y-2">
-        <p className="text-sm whitespace-pre-wrap leading-relaxed">
-          {textContent.split(/(@[a-z0-9_]+)/gi).map((part, i) => {
-            if (/^@[a-z0-9_]+$/i.test(part)) {
-              const username = part.substring(1);
-              const isMe = profile?.username === username;
-              return (
-                <span key={i} className={`px-1 rounded font-semibold ${isMe ? "bg-accent-soft text-accent" : "bg-surface-2 text-accent"}`}>
-                  {part}
-                </span>
-              );
-            }
-            return part;
-          })}
-        </p>
+        {textContent && (
+          <p className="text-sm whitespace-pre-wrap leading-relaxed">
+            {textContent.split(/(@[a-z0-9_]+)/gi).map((part, i) => {
+              if (/^@[a-z0-9_]+$/i.test(part)) {
+                const username = part.substring(1);
+                const isMe = profile?.username === username;
+                return (
+                  <span key={i} className={`px-1 rounded font-semibold ${isMe ? "bg-accent-soft text-accent" : "bg-surface-2 text-accent"}`}>
+                    {part}
+                  </span>
+                );
+              }
+              return part;
+            })}
+          </p>
+        )}
         {imgMatch && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={imgMatch[1]} alt="uploaded" className="max-w-xs max-h-64 rounded-xl object-cover shadow-sm border border-line" />
+          <img src={imgMatch[2]} alt={imgMatch[1] || "uploaded image"} className="max-w-xs max-h-64 rounded-xl object-cover shadow-sm border border-line cursor-pointer hover:opacity-95 transition" onClick={() => window.open(imgMatch[2], "_blank")} />
+        )}
+        {fileMatch && (
+          <a
+            href={fileMatch[2]}
+            target="_blank"
+            rel="noopener noreferrer"
+            download
+            className="flex items-center gap-2.5 rounded-xl border border-line bg-surface-2 p-2.5 text-xs font-semibold text-text hover:bg-surface-3 transition max-w-xs"
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent shrink-0">
+              <Paperclip className="h-4 w-4" />
+            </div>
+            <div className="flex-1 truncate">
+              <span className="truncate block font-medium">{fileMatch[1]}</span>
+              <span className="text-[10px] text-muted block">클릭하여 다운로드</span>
+            </div>
+          </a>
         )}
       </div>
     );
@@ -1545,13 +1574,18 @@ export default function DashboardPage() {
               )}
 
               <div className="relative flex items-end gap-2 rounded-2xl border px-3 py-1.5 transition-shadow focus-within:ring-2 focus-within:ring-accent/20 bg-surface-2 border-line">
-                <input type="file" ref={fileInputRef} accept="image/*" onChange={(e) => {
+                <input type="file" ref={fileInputRef} onChange={(e) => {
                   const f = e.target.files?.[0]; if(!f) return; setPendingFile(f);
-                  const r = new FileReader(); r.onload=()=>setImagePreview(r.result as string); r.readAsDataURL(f); e.target.value = "";
+                  if (f.type.startsWith("image/")) {
+                    const r = new FileReader(); r.onload=()=>setImagePreview(r.result as string); r.readAsDataURL(f);
+                  } else {
+                    setImagePreview(null);
+                  }
+                  e.target.value = "";
                 }} className="hidden" />
 
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="mb-1.5 rounded-full p-2 transition-colors text-muted hover:bg-line hover:text-text">
-                  <ImageIcon className="h-5 w-5" />
+                <button type="button" onClick={() => fileInputRef.current?.click()} title="파일/이미지 첨부" className="mb-1.5 rounded-full p-2 transition-colors text-muted hover:bg-line hover:text-text">
+                  <Paperclip className="h-5 w-5" />
                 </button>
 
                 <input ref={inputRef} type="text"

@@ -122,13 +122,18 @@ export async function DELETE(
 
     if (!isMessageAuthor) {
       const { createAuditLog } = await import("@/lib/audit");
+      const messageTextSnippet = message.content
+        ? message.content.length > 80
+          ? message.content.slice(0, 80) + "..."
+          : message.content
+        : "(첨부파일 / 내용 없음)";
       await createAuditLog({
         spaceId: message.channel.spaceId,
         actorId: user.id,
         actorName: user.displayName || user.username,
         action: "MANAGE_MESSAGES",
-        targetName: `Message in #${message.channel.name}`,
-        details: `Deleted message in #${message.channel.name}`,
+        targetName: `#${message.channel.name} 메시지`,
+        details: `[#${message.channel.name}] 채널에서 작성자(${message.profileId})의 메시지 삭제: "${messageTextSnippet}"`,
       });
     }
 
