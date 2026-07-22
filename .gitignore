@@ -52,3 +52,9 @@ next-env.d.ts
 
 # local tools
 /gh
+
+# AI Agent Context Files
+AGENTS.md
+CLAUDE.md
+CONTEXT.md
+HANDOFF.md
