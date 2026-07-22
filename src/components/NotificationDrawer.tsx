@@ -112,14 +112,14 @@ export function NotificationDrawer({
         )}
       </button>
 
-      {/* Slide / Popover Drawer Overlay */}
+      {/* Right Sidebar Drawer Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-[999] flex items-start justify-end p-4 bg-black/40 backdrop-blur-xs"
+          className="fixed inset-0 z-[999] flex justify-end bg-black/50 backdrop-blur-xs transition-opacity"
           onClick={() => setIsOpen(false)}
         >
           <div
-            className="w-80 md:w-96 rounded-2xl border border-white/15 bg-slate-950/95 p-4 shadow-2xl backdrop-blur-2xl animate-fadeIn mt-12 mr-4 text-left"
+            className="h-full w-80 md:w-96 border-l border-white/15 bg-zinc-950/95 p-4 shadow-2xl backdrop-blur-2xl flex flex-col text-left animate-fadeIn"
             onClick={(e) => e.stopPropagation()}
           >
           {/* Header */}

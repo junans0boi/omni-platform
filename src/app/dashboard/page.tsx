@@ -692,34 +692,40 @@ export default function DashboardPage() {
       {/* 1. Unified Space and Channel sidebar */}
       <div className="fixed md:relative left-0 inset-y-0 md:inset-y-auto z-40 md:z-20 flex flex-col overflow-hidden border-r border-white/5 bg-[#111113] transition-all duration-300 shrink-0"
         style={{ width: isChannelSidebarOpen ? "240px" : "0px", opacity: isChannelSidebarOpen ? 1 : 0 }}>
-        {/* Top Header: Brand & Global Switcher ([로고][스페이스][친구/DM]) */}
-        <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 px-3">
+        {/* Top Header: Brand Name & Settings Icon */}
+        <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/5 px-3">
           <div className="flex items-center gap-2">
-            <a href="/home" aria-label="Home" title="Home" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-sm font-bold text-white shadow-md shadow-indigo-600/30">Ω</a>
-            <span className="font-extrabold text-sm tracking-tight text-white">Omni Platform</span>
+            <a href="/home" aria-label="Home" title="Home" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-tr from-indigo-600 to-purple-600 text-xs font-bold text-white shadow-md shadow-indigo-600/30">Ω</a>
+            <span className="font-extrabold text-xs tracking-tight text-white">Omni Platform</span>
           </div>
+          <button onClick={() => setIsSettingsOpen(true)} title={t("settings.title")} className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition">
+            <Settings className="h-4 w-4" />
+          </button>
+        </div>
 
-          <div className="flex gap-1 bg-white/5 p-1 rounded-xl border border-white/10">
+        {/* Global Switcher Tabs ([💬 스페이스] | [👥 친구/DM]) */}
+        <div className="p-2 border-b border-white/5 bg-white/[0.01]">
+          <div className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-zinc-900/90 p-1">
             <button
               onClick={() => setMainView("space")}
-              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+              className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold transition ${
                 mainView === "space"
-                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm"
-                  : "text-zinc-400 hover:bg-white/5 hover:text-white"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                  : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
               }`}
             >
-              <span>💬</span>
+              <Compass className="h-3.5 w-3.5" />
               <span>스페이스</span>
             </button>
             <button
               onClick={() => setMainView("friends")}
-              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+              className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold transition ${
                 mainView === "friends"
-                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm"
-                  : "text-zinc-400 hover:bg-white/5 hover:text-white"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                  : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
               }`}
             >
-              <span>👥</span>
+              <Users className="h-3.5 w-3.5" />
               <span>친구/DM</span>
             </button>
           </div>
@@ -773,60 +779,84 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-2 py-3 space-y-3 no-scrollbar">
-              {/* Uncategorized General Channels */}
-              {channels.filter((c) => !c.categoryId).length > 0 && (
-                <div className="space-y-0.5">
-                  <div className="flex items-center justify-between px-2 py-1">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-500">일반 채널 (General)</span>
-                    {isAdminOrOwner && (
-                      <button onClick={() => { setNewChannelCategoryId(""); openModal("createChannel"); }} title="채널 추가" className="text-zinc-500 hover:text-white transition">
-                        <Plus className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                  {channels.filter((c) => !c.categoryId).map((ch) => {
-                    const isActive = ch.id === activeChannelId;
-                    const unreads = unreadBadges[ch.id] || 0;
-                    return (
-                      <div key={ch.id} className="group relative flex items-center">
-                        {renamingId === ch.id ? (
-                          <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === "Enter") handleRenameChannel(ch.id); if (e.key === "Escape") setRenamingId(null); }}
-                            onBlur={() => setRenamingId(null)}
-                            className="w-full rounded px-2 py-1 text-sm outline-hidden bg-zinc-800 text-white border border-indigo-500 ml-2" />
-                        ) : (
-                          <>
-                            <button onClick={() => { setActiveChannelId(ch.id); if (ch.type !== "TEXT") joinVoiceChannel(ch.id); }}
-                              onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "channel", id: ch.id, x: e.clientX, y: e.clientY, name: ch.name }); }}
-                              className={`flex flex-1 items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs transition ${isActive ? 'bg-indigo-600/20 text-white border border-indigo-500/40 font-semibold' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'}`}>
-                              {ch.type === "TEXT" ? <Hash className="h-3.5 w-3.5 shrink-0 opacity-70" /> : <Volume2 className="h-3.5 w-3.5 shrink-0 opacity-70 text-indigo-400" />}
-                              <span className="truncate text-left flex-1">{ch.name}</span>
-                              {ch.mode === "LECTURE" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">강의</span>}
-                              {ch.mode === "MEETING" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">회의</span>}
-                              {unreads > 0 && !isActive && (
-                                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-500 px-1 text-[10px] font-bold text-white">{unreads}</span>
-                              )}
-                              {isActive && activeVoiceChannelId === ch.id && <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
-                            </button>
+              {/* Channel List & Empty Fallbacks */}
+              {(() => {
+                const validCatIds = new Set(categories.map((cat) => cat.id));
+                const uncategorizedChannels = channels.filter((c) => !c.categoryId || !validCatIds.has(c.categoryId));
 
-                            {/* Hover Actions */}
-                            {isAdminOrOwner && (
-                              <div className="absolute right-1.5 hidden group-hover:flex items-center gap-1 bg-zinc-900/90 rounded-lg p-0.5 border border-white/10 shadow-md">
-                                <button onClick={() => { setRenamingId(ch.id); setRenameValue(ch.name); }} title="채널 이름 변경" className="p-1 text-zinc-400 hover:text-white transition">
-                                  <Edit2 className="h-3 w-3" />
-                                </button>
-                                <button onClick={() => handleDeleteChannel(ch.id)} title="채널 삭제" className="p-1 text-zinc-400 hover:text-rose-400 transition">
-                                  <Trash2 className="h-3 w-3" />
-                                </button>
-                              </div>
-                            )}
-                          </>
-                        )}
+                if (channels.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center p-4 text-center mt-4 space-y-2">
+                      <span className="text-xs text-zinc-500">채널이 아직 없습니다.</span>
+                      {isAdminOrOwner && (
+                        <button onClick={() => openModal("createChannel")} className="flex items-center gap-1 text-xs font-bold text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg border border-indigo-500/20 transition">
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>채널 만들기</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <>
+                    {/* Uncategorized / General Channels */}
+                    {(uncategorizedChannels.length > 0 || categories.length === 0) && (
+                      <div className="space-y-0.5">
+                        <div className="flex items-center justify-between px-2 py-1">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-500">일반 채널 (General)</span>
+                          {isAdminOrOwner && (
+                            <button onClick={() => { setNewChannelCategoryId(""); openModal("createChannel"); }} title="채널 추가" className="text-zinc-500 hover:text-white transition">
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                        {uncategorizedChannels.map((ch) => {
+                          const isActive = ch.id === activeChannelId;
+                          const unreads = unreadBadges[ch.id] || 0;
+                          return (
+                            <div key={ch.id} className="group relative flex items-center">
+                              {renamingId === ch.id ? (
+                                <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") handleRenameChannel(ch.id); if (e.key === "Escape") setRenamingId(null); }}
+                                  onBlur={() => setRenamingId(null)}
+                                  className="w-full rounded px-2 py-1 text-sm outline-hidden bg-zinc-800 text-white border border-indigo-500 ml-2" />
+                              ) : (
+                                <>
+                                  <button onClick={() => { setActiveChannelId(ch.id); if (ch.type !== "TEXT") joinVoiceChannel(ch.id); }}
+                                    onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "channel", id: ch.id, x: e.clientX, y: e.clientY, name: ch.name }); }}
+                                    className={`flex flex-1 items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs transition ${isActive ? 'bg-indigo-600/20 text-white border border-indigo-500/40 font-semibold' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'}`}>
+                                    {ch.type === "TEXT" ? <Hash className="h-3.5 w-3.5 shrink-0 opacity-70" /> : <Volume2 className="h-3.5 w-3.5 shrink-0 opacity-70 text-indigo-400" />}
+                                    <span className="truncate text-left flex-1">{ch.name}</span>
+                                    {ch.mode === "LECTURE" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">강의</span>}
+                                    {ch.mode === "MEETING" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">회의</span>}
+                                    {unreads > 0 && !isActive && (
+                                      <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-500 px-1 text-[10px] font-bold text-white">{unreads}</span>
+                                    )}
+                                    {isActive && activeVoiceChannelId === ch.id && <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
+                                  </button>
+
+                                  {/* Hover Actions */}
+                                  {isAdminOrOwner && (
+                                    <div className="absolute right-1.5 hidden group-hover:flex items-center gap-1 bg-zinc-900/90 rounded-lg p-0.5 border border-white/10 shadow-md">
+                                      <button onClick={() => { setRenamingId(ch.id); setRenameValue(ch.name); }} title="채널 이름 변경" className="p-1 text-zinc-400 hover:text-white transition">
+                                        <Edit2 className="h-3 w-3" />
+                                      </button>
+                                      <button onClick={() => handleDeleteChannel(ch.id)} title="채널 삭제" className="p-1 text-zinc-400 hover:text-rose-400 transition">
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Categorized Channels */}
               {categories.map((cat) => (
@@ -929,14 +959,6 @@ export default function DashboardPage() {
                   <span className="truncate text-sm font-semibold">{profile.displayName || profile.username}</span>
                   <span className={`truncate text-xs ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-500'}`}>@{profile.username}</span>
                 </div>
-                <NotificationDrawer
-                  onSelectChannel={(sId, cId) => {
-                    if (sId) setActiveSpaceId(sId);
-                    if (cId) setActiveChannelId(cId);
-                    setMainView("space");
-                  }}
-                  onOpenFriends={() => setMainView("friends")}
-                />
                 <button onClick={() => setIsSettingsOpen(true)} className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition" title={t("settings.title")}>
                   <Settings className="h-4 w-4" />
                 </button>
@@ -974,6 +996,14 @@ export default function DashboardPage() {
               </div>
               
               <div className="flex items-center gap-2">
+                <NotificationDrawer
+                  onSelectChannel={(sId, cId) => {
+                    if (sId) setActiveSpaceId(sId);
+                    if (cId) setActiveChannelId(cId);
+                    setMainView("space");
+                  }}
+                  onOpenFriends={() => setMainView("friends")}
+                />
                 <ChannelHeaderExtras messages={messages} />
                 <button
                   ref={memberDialogButtonRef}
