@@ -12,8 +12,7 @@ import {
   ImageIcon, Smile, PanelLeftClose, PanelLeft, Check, MessageSquare, Reply, Settings
 } from "lucide-react";
 import VoiceGrid from "@/components/VoiceGrid";
-import { LocaleSettings } from "@/components/LocaleSettings";
-import { SoundSettings } from "@/components/SoundSettings";
+
 import { SettingsModal } from "@/components/SettingsModal";
 import { FriendsPanel } from "@/components/FriendsPanel";
 import { ChannelHeaderExtras } from "@/components/ChannelHeaderExtras";
@@ -106,7 +105,8 @@ export default function DashboardPage() {
   const [mainView, setMainView] = useState<"space" | "friends">("space");
 
   useEffect(() => {
-    setMounted(true);
+    const timer = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const previousFirstMessageRef = useRef<string | null>(null);
@@ -375,8 +375,17 @@ export default function DashboardPage() {
           categoryId: newChannelCategoryId || null,
         }),
       });
-      if (res.ok) { setNewChannelName(""); closeModal(); await fetchSpaceData(activeSpaceId); }
-      else setFormError((await res.json()).error);
+      if (res.ok) {
+        const createdChannel = await res.json();
+        setNewChannelName("");
+        closeModal();
+        await fetchSpaceData(activeSpaceId);
+        if (createdChannel?.id) {
+          setActiveChannelId(createdChannel.id);
+        }
+      } else {
+        setFormError((await res.json()).error);
+      }
     } catch (error: unknown) { setFormError(getErrorMessage(error)); }
     setFormLoading(false);
   };
@@ -398,11 +407,16 @@ export default function DashboardPage() {
   };
 
   const handleDeleteChannel = async (channelId: string) => {
-    if (!confirm("Delete channel?")) return;
+    if (!confirm("이 채널을 정말 삭제하시겠습니까?")) return;
     setContextMenu(null);
-    await fetch(`/api/channels/${channelId}`, { method: "DELETE" });
-    if (activeSpaceId) await fetchSpaceData(activeSpaceId);
-    if (activeChannelId === channelId) setActiveChannelId(null);
+    const res = await fetch(`/api/channels/${channelId}`, { method: "DELETE" });
+    if (res.ok && activeSpaceId) {
+      await fetchSpaceData(activeSpaceId);
+      if (activeChannelId === channelId) {
+        const remaining = channels.filter(c => c.id !== channelId);
+        setActiveChannelId(remaining[0]?.id || null);
+      }
+    }
   };
 
   const handleRenameChannel = async (channelId: string) => {
@@ -743,30 +757,51 @@ export default function DashboardPage() {
               {/* Uncategorized General Channels */}
               {channels.filter((c) => !c.categoryId).length > 0 && (
                 <div className="space-y-0.5">
-                  <div className="px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider text-zinc-500">일반 채널 (General)</div>
+                  <div className="flex items-center justify-between px-2 py-1">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-500">일반 채널 (General)</span>
+                    {isAdminOrOwner && (
+                      <button onClick={() => { setNewChannelCategoryId(""); openModal("createChannel"); }} title="채널 추가" className="text-zinc-500 hover:text-white transition">
+                        <Plus className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
                   {channels.filter((c) => !c.categoryId).map((ch) => {
                     const isActive = ch.id === activeChannelId;
                     const unreads = unreadBadges[ch.id] || 0;
                     return (
-                      <div key={ch.id} className="group flex items-center">
+                      <div key={ch.id} className="group relative flex items-center">
                         {renamingId === ch.id ? (
                           <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
                             onKeyDown={(e) => { if (e.key === "Enter") handleRenameChannel(ch.id); if (e.key === "Escape") setRenamingId(null); }}
                             onBlur={() => setRenamingId(null)}
                             className="w-full rounded px-2 py-1 text-sm outline-hidden bg-zinc-800 text-white border border-indigo-500 ml-2" />
                         ) : (
-                          <button onClick={() => { setActiveChannelId(ch.id); if (ch.type !== "TEXT") joinVoiceChannel(ch.id); }}
-                            onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "channel", id: ch.id, x: e.clientX, y: e.clientY, name: ch.name }); }}
-                            className={`flex flex-1 items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs transition ${isActive ? 'bg-indigo-600/20 text-white border border-indigo-500/40 font-semibold' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'}`}>
-                            {ch.type === "TEXT" ? <Hash className="h-3.5 w-3.5 shrink-0 opacity-70" /> : <Volume2 className="h-3.5 w-3.5 shrink-0 opacity-70 text-indigo-400" />}
-                            <span className="truncate text-left flex-1">{ch.name}</span>
-                            {ch.mode === "LECTURE" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">강의</span>}
-                            {ch.mode === "MEETING" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">회의</span>}
-                            {unreads > 0 && !isActive && (
-                              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-500 px-1 text-[10px] font-bold text-white">{unreads}</span>
+                          <>
+                            <button onClick={() => { setActiveChannelId(ch.id); if (ch.type !== "TEXT") joinVoiceChannel(ch.id); }}
+                              onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "channel", id: ch.id, x: e.clientX, y: e.clientY, name: ch.name }); }}
+                              className={`flex flex-1 items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs transition ${isActive ? 'bg-indigo-600/20 text-white border border-indigo-500/40 font-semibold' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'}`}>
+                              {ch.type === "TEXT" ? <Hash className="h-3.5 w-3.5 shrink-0 opacity-70" /> : <Volume2 className="h-3.5 w-3.5 shrink-0 opacity-70 text-indigo-400" />}
+                              <span className="truncate text-left flex-1">{ch.name}</span>
+                              {ch.mode === "LECTURE" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">강의</span>}
+                              {ch.mode === "MEETING" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">회의</span>}
+                              {unreads > 0 && !isActive && (
+                                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-500 px-1 text-[10px] font-bold text-white">{unreads}</span>
+                              )}
+                              {isActive && activeVoiceChannelId === ch.id && <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
+                            </button>
+
+                            {/* Hover Actions */}
+                            {isAdminOrOwner && (
+                              <div className="absolute right-1.5 hidden group-hover:flex items-center gap-1 bg-zinc-900/90 rounded-lg p-0.5 border border-white/10 shadow-md">
+                                <button onClick={() => { setRenamingId(ch.id); setRenameValue(ch.name); }} title="채널 이름 변경" className="p-1 text-zinc-400 hover:text-white transition">
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                                <button onClick={() => handleDeleteChannel(ch.id)} title="채널 삭제" className="p-1 text-zinc-400 hover:text-rose-400 transition">
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
                             )}
-                            {isActive && activeVoiceChannelId === ch.id && <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
-                          </button>
+                          </>
                         )}
                       </div>
                     );
@@ -776,23 +811,36 @@ export default function DashboardPage() {
 
               {/* Categorized Channels */}
               {categories.map((cat) => (
-                <div key={cat.id}>
-                  <button onClick={() => {
-                    const next = new Set(collapsedCats);
-                    if (next.has(cat.id)) next.delete(cat.id);
-                    else next.add(cat.id);
-                    setCollapsedCats(next);
-                  }}
-                    onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "category", id: cat.id, x: e.clientX, y: e.clientY, name: cat.name }); }}
-                    className="flex w-full items-center gap-1 px-1 py-1 text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 transition">
-                    {collapsedCats.has(cat.id) ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                    {renamingId === cat.id ? (
-                      <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleRenameCategory(cat.id); if (e.key === "Escape") setRenamingId(null); }}
-                        onBlur={() => setRenamingId(null)}
-                        className="flex-1 rounded px-1.5 py-0.5 text-xs outline-hidden bg-zinc-800 text-white border border-indigo-500" onClick={(e) => e.stopPropagation()} />
-                    ) : <span className="flex-1 text-left">{cat.name}</span>}
-                  </button>
+                <div key={cat.id} className="group/cat">
+                  <div className="flex items-center justify-between px-1 py-1">
+                    <button onClick={() => {
+                      const next = new Set(collapsedCats);
+                      if (next.has(cat.id)) next.delete(cat.id);
+                      else next.add(cat.id);
+                      setCollapsedCats(next);
+                    }}
+                      onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "category", id: cat.id, x: e.clientX, y: e.clientY, name: cat.name }); }}
+                      className="flex flex-1 items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 transition">
+                      {collapsedCats.has(cat.id) ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      {renamingId === cat.id ? (
+                        <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleRenameCategory(cat.id); if (e.key === "Escape") setRenamingId(null); }}
+                          onBlur={() => setRenamingId(null)}
+                          className="flex-1 rounded px-1.5 py-0.5 text-xs outline-hidden bg-zinc-800 text-white border border-indigo-500" onClick={(e) => e.stopPropagation()} />
+                      ) : <span className="flex-1 text-left">{cat.name}</span>}
+                    </button>
+
+                    {isAdminOrOwner && (
+                      <div className="flex items-center gap-1 opacity-0 group-hover/cat:opacity-100 transition">
+                        <button onClick={() => { setNewChannelCategoryId(cat.id); openModal("createChannel"); }} title="카테고리에 채널 추가" className="p-0.5 text-zinc-500 hover:text-white transition">
+                          <Plus className="h-3 w-3" />
+                        </button>
+                        <button onClick={() => handleDeleteCategory(cat.id)} title="카테고리 삭제" className="p-0.5 text-zinc-500 hover:text-rose-400 transition">
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   {!collapsedCats.has(cat.id) && (
                     <div className="mt-1 space-y-0.5">
@@ -800,25 +848,39 @@ export default function DashboardPage() {
                         const isActive = ch.id === activeChannelId;
                         const unreads = unreadBadges[ch.id] || 0;
                         return (
-                          <div key={ch.id} className="group flex items-center">
+                          <div key={ch.id} className="group relative flex items-center">
                             {renamingId === ch.id ? (
                               <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
                                 onKeyDown={(e) => { if (e.key === "Enter") handleRenameChannel(ch.id); if (e.key === "Escape") setRenamingId(null); }}
                                 onBlur={() => setRenamingId(null)}
                                 className="w-full rounded px-2 py-1 text-sm outline-hidden bg-zinc-800 text-white border border-indigo-500 ml-5" />
                             ) : (
-                              <button onClick={() => { setActiveChannelId(ch.id); if (ch.type !== "TEXT") joinVoiceChannel(ch.id); }}
-                                onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "channel", id: ch.id, x: e.clientX, y: e.clientY, name: ch.name }); }}
-                                className={`flex flex-1 items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs transition ${isActive ? 'bg-indigo-600/20 text-white border border-indigo-500/40 font-semibold' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'}`}>
-                                {ch.type === "TEXT" ? <Hash className="h-3.5 w-3.5 shrink-0 opacity-70" /> : <Volume2 className="h-3.5 w-3.5 shrink-0 opacity-70 text-indigo-400" />}
-                                <span className="truncate text-left flex-1">{ch.name}</span>
-                                {ch.mode === "LECTURE" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">강의</span>}
-                                {ch.mode === "MEETING" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">회의</span>}
-                                {unreads > 0 && !isActive && (
-                                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-500 px-1 text-[10px] font-bold text-white">{unreads}</span>
+                              <>
+                                <button onClick={() => { setActiveChannelId(ch.id); if (ch.type !== "TEXT") joinVoiceChannel(ch.id); }}
+                                  onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "channel", id: ch.id, x: e.clientX, y: e.clientY, name: ch.name }); }}
+                                  className={`flex flex-1 items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs transition ${isActive ? 'bg-indigo-600/20 text-white border border-indigo-500/40 font-semibold' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'}`}>
+                                  {ch.type === "TEXT" ? <Hash className="h-3.5 w-3.5 shrink-0 opacity-70" /> : <Volume2 className="h-3.5 w-3.5 shrink-0 opacity-70 text-indigo-400" />}
+                                  <span className="truncate text-left flex-1">{ch.name}</span>
+                                  {ch.mode === "LECTURE" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">강의</span>}
+                                  {ch.mode === "MEETING" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">회의</span>}
+                                  {unreads > 0 && !isActive && (
+                                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-500 px-1 text-[10px] font-bold text-white">{unreads}</span>
+                                  )}
+                                  {isActive && activeVoiceChannelId === ch.id && <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
+                                </button>
+
+                                {/* Hover Actions */}
+                                {isAdminOrOwner && (
+                                  <div className="absolute right-1.5 hidden group-hover:flex items-center gap-1 bg-zinc-900/90 rounded-lg p-0.5 border border-white/10 shadow-md">
+                                    <button onClick={() => { setRenamingId(ch.id); setRenameValue(ch.name); }} title="채널 이름 변경" className="p-1 text-zinc-400 hover:text-white transition">
+                                      <Edit2 className="h-3 w-3" />
+                                    </button>
+                                    <button onClick={() => handleDeleteChannel(ch.id)} title="채널 삭제" className="p-1 text-zinc-400 hover:text-rose-400 transition">
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
+                                  </div>
                                 )}
-                                {isActive && activeVoiceChannelId === ch.id && <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
-                              </button>
+                              </>
                             )}
                           </div>
                         );
@@ -1306,7 +1368,7 @@ export default function DashboardPage() {
                       { mode: "MEETING", label: "🎙️ 회의 모드", desc: "순서 대기열" },
                       { mode: "LECTURE", label: "🎓 강의 모드", desc: "선생님/학생 손들기" },
                     ].map(item => (
-                      <button key={item.mode} type="button" onClick={() => setNewChannelMode(item.mode as any)} className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition ${newChannelMode === item.mode ? 'border-indigo-500 bg-indigo-500/15 text-indigo-300 font-bold' : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:bg-zinc-800'}`}>
+                      <button key={item.mode} type="button" onClick={() => setNewChannelMode(item.mode as "GENERAL" | "MEETING" | "LECTURE")} className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition ${newChannelMode === item.mode ? 'border-indigo-500 bg-indigo-500/15 text-indigo-300 font-bold' : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:bg-zinc-800'}`}>
                         <span className="text-xs font-bold">{item.label}</span>
                         <span className="text-[10px] text-zinc-500 mt-0.5">{item.desc}</span>
                       </button>

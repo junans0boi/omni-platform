@@ -28,7 +28,7 @@ export function isPermission(value: string): value is Permission {
 
 export function canFromSnapshot(authority: AuthoritySnapshot | null, permission: Permission): boolean {
   if (!authority) return false;
-  if (authority.membershipRole === "OWNER") return true;
+  if (authority.membershipRole === "OWNER" || authority.membershipRole === "ADMIN") return true;
   return authority.permissions.includes(permission);
 }
 

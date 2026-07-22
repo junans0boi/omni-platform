@@ -32,9 +32,6 @@ test("a new user signs up, receives a safe session, and can log back in", async 
   await expect(membersButton).toBeFocused();
 
   await page.getByRole("button", { name: "My Profile" }).click();
-  await expect(page.getByRole("group", { name: "Sound effects" })).toBeVisible();
-  await expect(page.getByRole("slider", { name: "Sound effects volume" })).toHaveValue("35");
-  await page.getByRole("checkbox", { name: "Enable sound effects" }).uncheck();
   await page.getByLabel("AVAILABILITY").selectOption("DND");
   await page.getByLabel("CUSTOM STATUS").fill("Heads down");
   await page.getByRole("button", { name: "Save" }).click();
