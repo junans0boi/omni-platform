@@ -23,7 +23,7 @@ export interface SoundPreference {
 
 export const DEFAULT_SOUND_PREFERENCE: Readonly<SoundPreference> = Object.freeze({
   enabled: true,
-  masterVolume: 70,
+  masterVolume: 35,
 });
 
 export interface SoundPlayback {

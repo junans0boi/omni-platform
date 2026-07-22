@@ -9,7 +9,7 @@ import { getErrorMessage } from "@/lib/errors";
 import {
   Hash, Volume2, Plus, Compass, LogOut, Trash2, Copy, X, Send,
   Users, ChevronDown, ChevronRight, ChevronLeft, Edit2, Crown, Shield, UserMinus,
-  ImageIcon, Smile, PanelLeftClose, PanelLeft, Check, MessageSquare, Reply, Settings, UserPlus, Lock, Paperclip
+  Smile, PanelLeftClose, PanelLeft, Check, MessageSquare, Reply, Settings, UserPlus, Lock, Paperclip
 } from "lucide-react";
 import VoiceGrid from "@/components/VoiceGrid";
 
