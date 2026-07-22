@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { getSoundEffects } from "@/lib/browser-sound-effects";
 import type { Profile } from "@/store/useAppStore";
@@ -94,9 +94,74 @@ export function SettingsModal({
   // Language & Time State
   const [timeFormat, setTimeFormat] = useState<"auto" | "12h" | "24h">("auto");
 
-  // Enumerate media devices
+  // Fetch & Sync Preferences
+  const fetchUserPreferences = useCallback(async () => {
+    try {
+      const res = await fetch("/api/user-preferences");
+      if (res.ok) {
+        const pref = await res.json();
+        if (typeof pref.pcNotification === "boolean") setPcNotification(pref.pcNotification);
+        if (typeof pref.friendAnniversary === "boolean") setFriendAnniversary(pref.friendAnniversary);
+        if (typeof pref.friendOnline === "boolean") setFriendOnline(pref.friendOnline);
+        if (typeof pref.friendProfileUpdate === "boolean") setFriendProfileUpdate(pref.friendProfileUpdate);
+        if (typeof pref.reactionNotification === "string") setReactionNotification(pref.reactionNotification as "all" | "mentions" | "none");
+        if (typeof pref.newMessageSound === "boolean") setNewMessageSound(pref.newMessageSound);
+        if (typeof pref.activeChannelSound === "boolean") setActiveChannelSound(pref.activeChannelSound);
+        if (typeof pref.ringtoneSound === "boolean") setRingtoneSound(pref.ringtoneSound);
+        if (typeof pref.disableAllSounds === "boolean") setDisableAllSounds(pref.disableAllSounds);
+        if (pref.micDeviceId) setSelectedMic(pref.micDeviceId);
+        if (pref.speakerDeviceId) setSelectedSpeaker(pref.speakerDeviceId);
+        if (pref.cameraDeviceId) setSelectedCamera(pref.cameraDeviceId);
+        if (typeof pref.micVolume === "number") setMicVolume(pref.micVolume);
+        if (typeof pref.speakerVolume === "number") setSpeakerVolume(pref.speakerVolume);
+        if (typeof pref.inputProfile === "string") setInputProfile(pref.inputProfile as "isolation" | "studio" | "custom");
+        if (typeof pref.pushToTalk === "boolean") setPushToTalk(pref.pushToTalk);
+        if (typeof pref.alwaysPreviewVideo === "boolean") setAlwaysPreviewVideo(pref.alwaysPreviewVideo);
+        if (typeof pref.timeFormat === "string") setTimeFormat(pref.timeFormat as "auto" | "12h" | "24h");
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  const updatePreference = async (updates: Record<string, unknown>) => {
+    try {
+      await fetch("/api/user-preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+    } catch {
+      // Ignore
+    }
+  };
+
+  const handleUpdateAccount = async (data: Record<string, unknown>) => {
+    try {
+      const res = await fetch("/api/auth/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        if (result.user) onProfileUpdate(result.user);
+        return { ok: true, data: result };
+      } else {
+        const error = await res.json();
+        return { ok: false, error: error.error };
+      }
+    } catch (err: unknown) {
+      return { ok: false, error: err instanceof Error ? err.message : "Error" };
+    }
+  };
+
+  // Enumerate media devices & fetch preferences
   useEffect(() => {
     if (!isOpen) return;
+
+    fetchUserPreferences();
+
     if (typeof navigator !== "undefined" && navigator.mediaDevices?.enumerateDevices) {
       navigator.mediaDevices
         .enumerateDevices()
@@ -113,7 +178,7 @@ export function SettingsModal({
         })
         .catch(() => {});
     }
-  }, [isOpen, selectedMic, selectedSpeaker, selectedCamera]);
+  }, [isOpen, fetchUserPreferences, selectedMic, selectedSpeaker, selectedCamera]);
 
   // Mic test simulation timer
   useEffect(() => {
@@ -166,19 +231,31 @@ export function SettingsModal({
     getSoundEffects()?.emit("INACTIVE_MESSAGE");
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPassword || !newPassword) {
       setPasswordMsg("현재 비밀번호와 새 비밀번호를 입력해주세요.");
       return;
     }
-    setPasswordMsg("비밀번호가 성공적으로 변경되었습니다.");
-    setCurrentPassword("");
-    setNewPassword("");
-    setTimeout(() => {
-      setIsEditingPassword(false);
-      setPasswordMsg(null);
-    }, 1500);
+    const res = await handleUpdateAccount({ currentPassword, newPassword });
+    if (res.ok) {
+      setPasswordMsg("비밀번호가 성공적으로 변경되었습니다.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setTimeout(() => {
+        setIsEditingPassword(false);
+        setPasswordMsg(null);
+      }, 1500);
+    } else {
+      setPasswordMsg(res.error || "비밀번호 변경 실패");
+    }
+  };
+
+  const handleSaveUsername = async () => {
+    if (isEditingUsername) {
+      await handleUpdateAccount({ username });
+    }
+    setIsEditingUsername(!isEditingUsername);
   };
 
   if (!isOpen) return null;
@@ -318,7 +395,7 @@ export function SettingsModal({
                     )}
                   </div>
                   <button
-                    onClick={() => setIsEditingUsername(!isEditingUsername)}
+                    onClick={handleSaveUsername}
                     className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:bg-white/10 hover:text-white transition"
                   >
                     <Edit2 className="h-3.5 w-3.5" />

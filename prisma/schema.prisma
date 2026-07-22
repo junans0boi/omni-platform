@@ -15,10 +15,12 @@ model Profile {
   avatarUrl            String?
   availability         String              @default("AVAILABLE")
   customStatus         String?
+  phone                String?
   password             String? // Legacy plaintext credential; cleared after a successful login
   passwordHash         String?
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
+  userPreference       UserPreference?
   spaces               Space[]             @relation("SpaceOwner")
   members              Member[]
   messages             Message[]
@@ -245,4 +247,40 @@ model DirectMessage {
 
   @@index([conversationId, createdAt, id])
   @@index([profileId])
+}
+
+model UserPreference {
+  id                   String   @id @default(uuid())
+  profileId            String   @unique
+  profile              Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  // Notifications
+  pcNotification       Boolean  @default(true)
+  friendAnniversary    Boolean  @default(true)
+  friendOnline         Boolean  @default(true)
+  friendProfileUpdate  Boolean  @default(true)
+  reactionNotification String   @default("all")
+
+  // Sound
+  newMessageSound      Boolean  @default(true)
+  activeChannelSound   Boolean  @default(true)
+  ringtoneSound        Boolean  @default(true)
+  disableAllSounds     Boolean  @default(false)
+
+  // Voice & Video
+  micDeviceId          String?
+  speakerDeviceId      String?
+  cameraDeviceId       String?
+  micVolume            Int      @default(80)
+  speakerVolume        Int      @default(85)
+  inputProfile         String   @default("isolation")
+  pushToTalk           Boolean  @default(false)
+  alwaysPreviewVideo   Boolean  @default(true)
+
+  // Language & Time
+  locale               String   @default("ko")
+  timeFormat           String   @default("auto")
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
