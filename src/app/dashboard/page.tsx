@@ -226,14 +226,14 @@ export default function DashboardPage() {
     const checkAuth = async () => {
       try {
         const res = await fetch("/api/auth/me");
-        if (!res.ok) { router.push("/login"); return; }
+        if (!res.ok) { window.location.href = "/login"; return; }
         const data = await res.json();
         if (data.user) setProfile(data.user);
         await fetchSpaces();
-      } catch { router.push("/login"); }
+      } catch { window.location.href = "/login"; }
     };
     checkAuth();
-  }, [router, setProfile, fetchSpaces]);
+  }, [setProfile, fetchSpaces]);
 
   useEffect(() => {
     if (spaces.length > 0 && !activeSpaceId) setActiveSpaceId(spaces[0].id);

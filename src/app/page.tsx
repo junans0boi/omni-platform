@@ -13,23 +13,23 @@ export default function Home() {
       try {
         const res = await fetch("/api/auth/me");
         if (res.ok) {
-          router.replace("/dashboard");
+          window.location.href = "/dashboard";
         } else {
-          router.replace("/login");
+          window.location.href = "/login";
         }
       } catch {
-        router.replace("/login");
+        window.location.href = "/login";
       }
     };
 
     checkUser();
-  }, [router]);
+  }, []);
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-black text-white">
+    <div className="flex h-screen w-screen items-center justify-center bg-[#09090b] text-white">
       <div className="flex flex-col items-center gap-4">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
-        <p className="text-sm text-zinc-400">{t("landing.loading")}</p>
+        <p className="text-sm font-semibold text-zinc-300">{t("landing.loading")}</p>
       </div>
     </div>
   );
