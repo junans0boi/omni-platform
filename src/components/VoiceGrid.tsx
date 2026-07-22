@@ -47,8 +47,22 @@ export default function VoiceGrid() {
     channels: state.channels,
   })));
 
+  const { spaces, activeSpaceId, members } = useAppStore(
+    useShallow((state) => ({
+      spaces: state.spaces,
+      activeSpaceId: state.activeSpaceId,
+      members: state.members,
+    }))
+  );
+
   const activeChannel = channels.find((c) => c.id === activeVoiceChannelId);
-  const isHost = activeChannel ? true : false;
+  const activeSpace = spaces.find((s) => s.id === activeSpaceId);
+  const currentMember = members.find((m) => m.profileId === profile?.id && m.spaceId === activeSpaceId);
+  const isHost = Boolean(
+    activeSpace?.ownerId === profile?.id ||
+    currentMember?.role === "OWNER" ||
+    currentMember?.role === "ADMIN"
+  );
 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);

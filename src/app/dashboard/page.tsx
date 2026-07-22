@@ -48,7 +48,7 @@ export default function DashboardPage() {
     theme, unreadBadges,
     setTheme, setProfile, fetchSpaces, fetchSpaceData, fetchMessages,
     createSpace, joinSpace, deleteSpace, sendMessage, editMessage, deleteMessage, toggleReaction,
-    setActiveSpaceId, setActiveChannelId, joinVoiceChannel, activeVoiceChannelId,
+    setActiveSpaceId, setActiveChannelId, joinVoiceChannel, leaveVoiceChannel, activeVoiceChannelId,
   } = useAppStore(useShallow((state) => ({
     profile: state.profile,
     spaces: state.spaces,
@@ -79,6 +79,7 @@ export default function DashboardPage() {
     setActiveSpaceId: state.setActiveSpaceId,
     setActiveChannelId: state.setActiveChannelId,
     joinVoiceChannel: state.joinVoiceChannel,
+    leaveVoiceChannel: state.leaveVoiceChannel,
     activeVoiceChannelId: state.activeVoiceChannelId,
   })));
 
@@ -241,6 +242,12 @@ export default function DashboardPage() {
   useEffect(() => {
     if (activeSpaceId) fetchSpaceData(activeSpaceId);
   }, [activeSpaceId, fetchSpaceData]);
+
+  useEffect(() => {
+    const handleCloseMenu = () => setContextMenu(null);
+    window.addEventListener("click", handleCloseMenu);
+    return () => window.removeEventListener("click", handleCloseMenu);
+  }, []);
 
   useEffect(() => {
     if (channels.length > 0) {
@@ -407,27 +414,39 @@ export default function DashboardPage() {
   };
 
   const handleDeleteChannel = async (channelId: string) => {
-    if (!confirm("이 채널을 정말 삭제하시겠습니까?")) return;
+    if (!activeSpaceId || !confirm("이 채널을 정말 삭제하시겠습니까?")) return;
     setContextMenu(null);
-    const res = await fetch(`/api/channels/${channelId}`, { method: "DELETE" });
-    if (res.ok && activeSpaceId) {
-      await fetchSpaceData(activeSpaceId);
-      if (activeChannelId === channelId) {
-        const remaining = channels.filter(c => c.id !== channelId);
-        setActiveChannelId(remaining[0]?.id || null);
+    try {
+      const res = await fetch(`/api/spaces/${activeSpaceId}/channels/${channelId}`, { method: "DELETE" });
+      if (res.ok) {
+        await fetchSpaceData(activeSpaceId);
+        if (activeChannelId === channelId) {
+          const remaining = channels.filter((c) => c.id !== channelId);
+          setActiveChannelId(remaining[0]?.id || null);
+        }
+        if (activeVoiceChannelId === channelId) {
+          leaveVoiceChannel();
+        }
       }
+    } catch {
+      // Ignore
     }
   };
 
   const handleRenameChannel = async (channelId: string) => {
-    if (!renameValue.trim()) return;
-    await fetch(`/api/channels/${channelId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: renameValue.trim() }),
-    });
-    setRenamingId(null); setRenameValue("");
-    if (activeSpaceId) await fetchSpaceData(activeSpaceId);
+    if (!activeSpaceId || !renameValue.trim()) return;
+    try {
+      await fetch(`/api/spaces/${activeSpaceId}/channels/${channelId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: renameValue.trim() }),
+      });
+      setRenamingId(null);
+      setRenameValue("");
+      await fetchSpaceData(activeSpaceId);
+    } catch {
+      // Ignore
+    }
   };
 
   const handleRenameCategory = async (categoryId: string) => {
