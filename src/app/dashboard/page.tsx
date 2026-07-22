@@ -1546,12 +1546,29 @@ export default function DashboardPage() {
                   </div>
                 ) : null;
               })()}
-              {/* Image Preview */}
-              {imagePreview && (
-                <div className="mb-2 inline-flex items-center gap-3 rounded-xl border p-2 shadow-sm bg-surface-2 border-line">
-                  <img src={imagePreview} alt="preview" className="h-16 w-16 rounded-lg object-cover" />
-                  <span className="text-xs max-w-[200px] truncate">{pendingFile?.name}</span>
-                  <button onClick={() => { setImagePreview(null); setPendingFile(null); }} className="p-1 rounded-full hover:bg-danger/10 text-danger mr-1"><X className="h-4 w-4" /></button>
+              {/* Pending File Banner (Images & General Files) */}
+              {pendingFile && (
+                <div className="mb-2 inline-flex items-center gap-3 rounded-xl border px-3 py-2 shadow-sm bg-surface-2 border-line text-xs font-medium">
+                  {imagePreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={imagePreview} alt="preview" className="h-12 w-12 rounded-lg object-cover shrink-0" />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-soft text-accent shrink-0">
+                      <Paperclip className="h-5 w-5" />
+                    </div>
+                  )}
+                  <div className="flex flex-col min-w-0 max-w-[220px]">
+                    <span className="truncate font-semibold text-text">{pendingFile.name}</span>
+                    <span className="text-[10px] text-muted font-normal">({(pendingFile.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setImagePreview(null); setPendingFile(null); }}
+                    className="p-1 rounded-full hover:bg-danger/10 text-danger transition ml-1"
+                    aria-label="Remove attachment"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
               )}
 
