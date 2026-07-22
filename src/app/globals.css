@@ -1,26 +1,153 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Fixed, theme-invariant semantic tokens — presence/danger meaning stays
+   recognizable no matter which brand palette (theme) is active. */
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --danger: #ef4444;
+  --danger-strong: #dc2626;
+  --online: #34d399;
+  --idle: #fbbf24;
+  --dnd: var(--danger);
+  --success: var(--online);
+
+  /* Pre-hydration fallback (mirrors "default" dark) — the [data-theme-name]
+     blocks below always win once the FOUC script tags <html>, but the very
+     first paint (before that inline script runs) has no attribute yet, so
+     these unscoped values stand in to avoid a flash of unstyled white. */
+  --bg: #09090b;
+  --bg-elevated: #18181b;
+  --surface: #0c0c0e;
+  --surface-2: #18181b;
+  --line: rgba(255, 255, 255, 0.1);
+  --text: #e4e4e7;
+  --text-muted: #a1a1aa;
+  --accent: #4f46e5;
+  --accent-strong: #6366f1;
+  --accent-soft: color-mix(in oklab, var(--accent) 20%, transparent);
+  --on-accent: #ffffff;
+  --accent-live: var(--accent-strong);
 }
 
-:root.dark {
-  --background: #09090b;
-  --foreground: #e4e4e7;
+/* ---- default (the app's original look, formalized as tokens) ---- */
+:root[data-theme-name="default"] {
+  --bg: #f8fafc;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --line: #e2e8f0;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --accent: #4f46e5;
+  --accent-strong: #4338ca;
+  --accent-soft: color-mix(in oklab, var(--accent) 15%, transparent);
+  --on-accent: #ffffff;
+  --accent-live: var(--accent-strong);
+}
+:root[data-theme-name="default"].dark {
+  --bg: #09090b;
+  --bg-elevated: #18181b;
+  --surface: #0c0c0e;
+  --surface-2: #18181b;
+  --line: rgba(255, 255, 255, 0.1);
+  --text: #e4e4e7;
+  --text-muted: #a1a1aa;
+  --accent: #4f46e5;
+  --accent-strong: #6366f1;
+  --accent-soft: color-mix(in oklab, var(--accent) 20%, transparent);
+  --on-accent: #ffffff;
+  --accent-live: var(--accent-strong);
+}
+
+/* ---- transmission — broadcast/signal metaphor ---- */
+:root[data-theme-name="transmission"] {
+  --bg: #f4f0e6;
+  --bg-elevated: #fbf9f2;
+  --surface: #ece6d6;
+  --surface-2: #e2dac5;
+  --line: #cdc3a6;
+  --text: #1e1b12;
+  --text-muted: #6b6350;
+  --accent: #c97327;
+  --accent-strong: #a85c1c;
+  --accent-soft: color-mix(in oklab, var(--accent) 15%, transparent);
+  --on-accent: #ffffff;
+  --accent-live: #7a9c1f;
+}
+:root[data-theme-name="transmission"].dark {
+  --bg: #12141a;
+  --bg-elevated: #1a1d26;
+  --surface: #1a1d26;
+  --surface-2: #242833;
+  --line: #2a2e39;
+  --text: #ece7da;
+  --text-muted: #7d8394;
+  --accent: #ff9d3f;
+  --accent-strong: #ffb266;
+  --accent-soft: color-mix(in oklab, var(--accent) 20%, transparent);
+  --on-accent: #1a1204;
+  --accent-live: #7fd858;
+}
+
+/* ---- night-signal — nightlife/flyer metaphor ---- */
+:root[data-theme-name="night-signal"] {
+  --bg: #f7f1fb;
+  --bg-elevated: #fffbff;
+  --surface: #f0e6f6;
+  --surface-2: #e5d6ee;
+  --line: #d8c3e3;
+  --text: #2a1638;
+  --text-muted: #7a6789;
+  --accent: #d6285c;
+  --accent-strong: #b81e4d;
+  --accent-soft: color-mix(in oklab, var(--accent) 15%, transparent);
+  --on-accent: #ffffff;
+  --accent-live: #7a9c1f;
+}
+:root[data-theme-name="night-signal"].dark {
+  --bg: #1b1024;
+  --bg-elevated: #241531;
+  --surface: #241531;
+  --surface-2: #31203f;
+  --line: #3a2749;
+  --text: #f3ecf7;
+  --text-muted: #9a8aa8;
+  --accent: #ff4f7b;
+  --accent-strong: #ff7098;
+  --accent-soft: color-mix(in oklab, var(--accent) 20%, transparent);
+  --on-accent: #2a0a15;
+  --accent-live: #c9ff5c;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-live: var(--accent-live);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-danger-strong: var(--danger-strong);
+  --color-online: var(--online);
+  --color-idle: var(--idle);
+  --color-dnd: var(--dnd);
+  --color-success: var(--success);
+  /* legacy alias — kept until every component finishes migrating off bg-background/text-foreground */
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg);
+  color: var(--text);
   font-family: Arial, Helvetica, sans-serif;
 }
 

@@ -64,41 +64,41 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-slate-100 px-4 text-zinc-900 dark:bg-radial dark:from-[#1e1b4b] dark:via-[#09090b] dark:to-black dark:text-white">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-bg px-4 text-text">
       {/* Dynamic ambient lights */}
-      <div className="absolute top-[-10%] left-[-10%] h-[500px] w-[500px] rounded-full bg-purple-600/10 blur-[120px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] h-[500px] w-[500px] rounded-full bg-indigo-600/10 blur-[120px]" />
+      <div className="absolute top-[-10%] left-[-10%] h-[500px] w-[500px] rounded-full bg-accent-soft blur-[120px]" />
+      <div className="absolute bottom-[-10%] right-[-10%] h-[500px] w-[500px] rounded-full bg-accent-soft blur-[120px]" />
 
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white/90 p-8 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-white/5">
+      <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-8 shadow-2xl backdrop-blur-xl">
         <div className="flex flex-col items-center mb-8">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-linear-to-tr from-indigo-500 to-purple-600 text-2xl font-bold shadow-lg shadow-indigo-500/30">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-2xl font-bold shadow-[0_4px_12px_-2px_var(--accent)]">
             Ω
           </div>
-          <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">{t("auth.signup.title")}</h2>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{t("auth.signup.subtitle")}</p>
+          <h2 className="mt-4 text-2xl font-bold tracking-tight text-text">{t("auth.signup.title")}</h2>
+          <p className="mt-1 text-sm text-muted">{t("auth.signup.subtitle")}</p>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg bg-red-500/10 p-3 text-sm text-red-400 border border-red-500/20">
+          <div className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger border border-danger/20">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="mb-4 rounded-lg bg-emerald-500/10 p-3 text-sm text-emerald-400 border border-emerald-500/20">
+          <div className="mb-4 rounded-lg bg-online/10 p-3 text-sm text-online border border-online/20">
             {t("auth.signup.success")}
           </div>
         )}
 
         <form onSubmit={handleSignup} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1">
               {t("auth.username")}
             </label>
             <input
               type="text"
               required
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 outline-hidden transition focus:border-indigo-500 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder-zinc-500 dark:focus:bg-white/10"
+              className="w-full rounded-lg border border-line bg-surface px-4 py-2.5 text-sm text-text placeholder-muted outline-hidden transition focus:border-accent focus:bg-surface-2"
               placeholder="johndoe"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -106,13 +106,13 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1">
               {t("auth.displayName")}
             </label>
             <input
               type="text"
               required
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 outline-hidden transition focus:border-indigo-500 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder-zinc-500 dark:focus:bg-white/10"
+              className="w-full rounded-lg border border-line bg-surface px-4 py-2.5 text-sm text-text placeholder-muted outline-hidden transition focus:border-accent focus:bg-surface-2"
               placeholder="John Doe"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
@@ -120,13 +120,13 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1">
               {t("auth.email")}
             </label>
             <input
               type="email"
               required
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 outline-hidden transition focus:border-indigo-500 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder-zinc-500 dark:focus:bg-white/10"
+              className="w-full rounded-lg border border-line bg-surface px-4 py-2.5 text-sm text-text placeholder-muted outline-hidden transition focus:border-accent focus:bg-surface-2"
               placeholder="name@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -134,14 +134,14 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1 flex justify-between">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1 flex justify-between">
               <span>{t("auth.password")}</span>
-              <span className="text-[10px] text-zinc-500 lowercase">({t("auth.passwordHint")})</span>
+              <span className="text-[10px] text-muted lowercase">({t("auth.passwordHint")})</span>
             </label>
             <input
               type="password"
               required
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 outline-hidden transition focus:border-indigo-500 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder-zinc-500 dark:focus:bg-white/10"
+              className="w-full rounded-lg border border-line bg-surface px-4 py-2.5 text-sm text-text placeholder-muted outline-hidden transition focus:border-accent focus:bg-surface-2"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -151,15 +151,15 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={loading || success}
-            className="w-full rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/30 transition hover:bg-indigo-500 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+            className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-on-accent shadow-[0_4px_12px_-2px_var(--accent)] transition hover:bg-accent-strong active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
           >
             {loading ? t("auth.signup.submitting") : t("auth.signup.submit")}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mt-6 text-center text-sm text-muted">
           {t("auth.signup.hasAccount")}{" "}
-          <Link href="/login" className="font-semibold text-indigo-400 hover:text-indigo-300">
+          <Link href="/login" className="font-semibold text-accent hover:text-accent-strong">
             {t("auth.login.submit")}
           </Link>
         </p>

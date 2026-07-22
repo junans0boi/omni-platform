@@ -29,15 +29,29 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   });
 
-  const formatted = conversations.map((conv) => {
-    const otherParticipant = conv.participants.find((p) => p.profileId !== user.id);
-    return {
-      id: conv.id,
-      updatedAt: conv.createdAt,
-      otherProfile: otherParticipant?.profile || null,
-      lastMessage: conv.messages[0] || null,
-    };
-  });
+  const formatted = await Promise.all(
+    conversations.map(async (conv) => {
+      const myParticipant = conv.participants.find((p) => p.profileId === user.id);
+      const otherParticipant = conv.participants.find((p) => p.profileId !== user.id);
+      const lastReadAt = myParticipant?.lastReadAt || new Date(0);
+
+      const unreadCount = await prisma.directMessage.count({
+        where: {
+          conversationId: conv.id,
+          profileId: { not: user.id },
+          createdAt: { gt: lastReadAt },
+        },
+      });
+
+      return {
+        id: conv.id,
+        updatedAt: conv.createdAt,
+        otherProfile: otherParticipant?.profile || null,
+        lastMessage: conv.messages[0] || null,
+        unreadCount,
+      };
+    })
+  );
 
   return NextResponse.json(formatted);
 }

@@ -375,25 +375,25 @@ export default function VoiceGrid() {
 
   return (
     <div
-      className="border-b border-white/5 bg-black/40 backdrop-blur-md"
+      className="border-b border-line bg-black/40 backdrop-blur-md"
       data-livekit-video-rendering={renderVideo ? "active" : "paused"}
     >
       {/* Header */}
       <div className="flex h-9 items-center justify-between px-4">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-muted">
           <span
             className={`h-2 w-2 rounded-full ${
-              isConnected ? "animate-pulse bg-emerald-500" : "bg-amber-500"
+              isConnected ? "animate-pulse bg-online" : "bg-idle"
             }`}
           />
           {connectionLabel}
           {visibleConnectionError && (
-            <span className="ml-2 text-red-400">— {visibleConnectionError}</span>
+            <span className="ml-2 text-danger">— {visibleConnectionError}</span>
           )}
         </span>
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 hover:bg-white/5 hover:text-white"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-surface hover:text-text"
         >
           {isCollapsed ? (
             <><span>Show</span><ChevronDown className="h-3 w-3" /></>
@@ -424,7 +424,7 @@ export default function VoiceGrid() {
                     setConnectionError(getErrorMessage(error));
                   }
                 }}
-                className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-500/25"
+                className="rounded-full bg-idle/15 px-3 py-1 text-xs font-semibold text-idle hover:bg-idle/25"
               >
                 오디오 재생 시작
               </button>
@@ -433,12 +433,12 @@ export default function VoiceGrid() {
           <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-4">
             {/* Local participant tile */}
             <div
-              className={`relative aspect-video overflow-hidden rounded-xl border bg-zinc-900 ${
+              className={`relative aspect-video overflow-hidden rounded-xl border bg-surface ${
                 hasLocalScreenShare ? "col-span-2" : ""
               } ${
                 activeSpeakerSids.includes(localParticipantSid)
-                  ? "border-emerald-500 shadow-md shadow-emerald-500/20"
-                  : "border-white/5"
+                  ? "border-online shadow-md shadow-online/20"
+                  : "border-line"
               }`}
             >
               <div
@@ -447,14 +447,14 @@ export default function VoiceGrid() {
               >
                 {!isCameraOn && !hasLocalScreenShare && (
                   <div className="flex flex-col items-center gap-1">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold uppercase text-white">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-xs font-bold uppercase text-text">
                       You
                     </div>
                   </div>
                 )}
               </div>
-              <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
-                {isEffectivelyMuted && <MicOff className="h-2.5 w-2.5 text-red-400" />}
+              <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-text backdrop-blur-xs">
+                {isEffectivelyMuted && <MicOff className="h-2.5 w-2.5 text-danger" />}
                 You
               </div>
             </div>
@@ -487,12 +487,12 @@ export default function VoiceGrid() {
                   data-livekit-participant={p.identity}
                   data-livekit-audio-subscribed={hasAudio}
                   data-livekit-video-source={hasScreenShare ? "screen_share" : hasVideo ? "camera" : "none"}
-                  className={`relative aspect-video overflow-hidden rounded-xl border bg-zinc-900 ${
+                  className={`relative aspect-video overflow-hidden rounded-xl border bg-surface ${
                     hasScreenShare ? "col-span-2" : ""
                   } ${
                     isSpeaking
-                      ? "border-emerald-500 shadow-md shadow-emerald-500/20"
-                      : "border-white/5"
+                      ? "border-online shadow-md shadow-online/20"
+                      : "border-line"
                   }`}
                 >
                   <div
@@ -503,16 +503,16 @@ export default function VoiceGrid() {
                     className="h-full w-full flex items-center justify-center"
                   >
                     {!hasVideo && (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold uppercase text-zinc-200">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-xs font-bold uppercase text-text">
                         {p.identity.substring(0, 2)}
                       </div>
                     )}
                   </div>
-                  <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
-                    {isMutedRemote && <MicOff className="h-2.5 w-2.5 text-red-400" />}
+                  <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-text backdrop-blur-xs">
+                    {isMutedRemote && <MicOff className="h-2.5 w-2.5 text-danger" />}
                     {p.name || p.identity}
                   </div>
-                  <label className="absolute right-1.5 bottom-1.5 flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">
+                  <label className="absolute right-1.5 bottom-1.5 flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-text">
                     <span className="sr-only">{p.name || p.identity} volume</span>
                     <Volume2 className="h-2.5 w-2.5" aria-hidden="true" />
                     <input
@@ -531,11 +531,11 @@ export default function VoiceGrid() {
           </div>
 
           {/* Controls */}
-          <div className="flex items-center justify-center gap-3 py-2.5 border-t border-white/5">
+          <div className="flex items-center justify-center gap-3 py-2.5 border-t border-line">
             <ControlButton
               active={!isEffectivelyMuted}
-              activeClass="bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10"
-              inactiveClass="bg-red-500/10 text-red-400 border-red-500/20"
+              activeClass="bg-surface text-muted border-line hover:bg-surface-2"
+              inactiveClass="bg-danger/10 text-danger border-danger/20"
               onClick={toggleMute}
               title={canPublish ? (isMuted ? "Unmute" : "Mute") : "스테이지 청취자는 마이크를 사용할 수 없습니다"}
               ariaPressed={isMuted}
@@ -546,8 +546,8 @@ export default function VoiceGrid() {
 
             <ControlButton
               active={isCameraOn}
-              activeClass="bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10"
-              inactiveClass="bg-red-500/10 text-red-400 border-red-500/20"
+              activeClass="bg-surface text-muted border-line hover:bg-surface-2"
+              inactiveClass="bg-danger/10 text-danger border-danger/20"
               onClick={toggleCamera}
               title={canPublish ? (isCameraOn ? "Camera Off" : "Camera On") : "스테이지 청취자는 카메라를 사용할 수 없습니다"}
               ariaPressed={isCameraOn}
@@ -558,8 +558,8 @@ export default function VoiceGrid() {
 
             <ControlButton
               active={isScreenSharing}
-              activeClass="bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-              inactiveClass="bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10"
+              activeClass="bg-online/10 text-online border-online/20"
+              inactiveClass="bg-surface text-muted border-line hover:bg-surface-2"
               onClick={toggleScreenShare}
               title={canPublish ? "Share Screen" : "스테이지 청취자는 화면을 공유할 수 없습니다"}
               ariaPressed={isScreenSharing}
@@ -570,14 +570,14 @@ export default function VoiceGrid() {
 
             {/* Mode & Host Badge */}
             {activeChannel && (
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold text-indigo-300">
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface border border-line text-[10px] font-bold text-accent">
                 <span>{activeChannel.mode === "LECTURE" ? "🎓 강의 모드" : activeChannel.mode === "MEETING" ? "🤝 회의 모드" : "💬 자유 모드"}</span>
                 {isHost && <span className="text-amber-400">👑</span>}
               </div>
             )}
 
             {/* Mode & Floor Controls */}
-            <div className="h-5 w-px bg-white/10" />
+            <div className="h-5 w-px bg-surface-2" />
 
             {/* Raise Hand Button */}
             <button
@@ -593,8 +593,8 @@ export default function VoiceGrid() {
               title="발언권/질문 신청 (Raise Hand)"
               className={`flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition active:scale-95 ${
                 handRaised
-                  ? "border-amber-500/50 bg-amber-500/20 text-amber-300 shadow-md shadow-amber-500/20 animate-pulse"
-                  : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
+                  ? "border-idle/50 bg-idle/20 text-idle shadow-md shadow-idle/20 animate-pulse"
+                  : "border-line bg-surface text-muted hover:bg-surface-2"
               }`}
             >
               <span>🖐️</span>
@@ -611,7 +611,7 @@ export default function VoiceGrid() {
                 <span>👑</span>
                 <span>신청자 목록</span>
                 {floorRequests.length > 0 && (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-slate-950">
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-idle text-[10px] font-bold text-slate-950">
                     {floorRequests.length}
                   </span>
                 )}
@@ -619,35 +619,35 @@ export default function VoiceGrid() {
 
               {/* Host Floor Requests Dropdown */}
               {showFloorPanel && (
-                <div className="absolute bottom-12 right-0 w-72 rounded-2xl border border-white/15 bg-slate-950/95 p-4 shadow-2xl backdrop-blur-2xl z-50 text-left">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
-                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                <div className="absolute bottom-12 right-0 w-72 rounded-2xl border border-line bg-surface p-4 shadow-2xl backdrop-blur-2xl z-50 text-left">
+                  <div className="flex items-center justify-between border-b border-line pb-2 mb-3">
+                    <span className="text-xs font-bold text-text flex items-center gap-1.5">
                       <span>👑</span> 발언/질문 신청자 목록
                     </span>
-                    <button onClick={() => setShowFloorPanel(false)} className="text-zinc-500 hover:text-white text-xs">✕</button>
+                    <button onClick={() => setShowFloorPanel(false)} className="text-muted hover:text-text text-xs">✕</button>
                   </div>
 
                   {floorRequests.length === 0 ? (
-                    <p className="py-4 text-center text-xs text-zinc-500">현재 발언 신청자가 없습니다.</p>
+                    <p className="py-4 text-center text-xs text-muted">현재 발언 신청자가 없습니다.</p>
                   ) : (
                     <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                       {floorRequests.map((req) => {
                         const isGranted = grantedSpeakers.includes(req.id);
                         return (
-                          <div key={req.id} className="flex items-center justify-between rounded-xl bg-white/5 p-2.5 text-xs">
-                            <span className="font-semibold text-white truncate max-w-[110px]">{req.name}</span>
+                          <div key={req.id} className="flex items-center justify-between rounded-xl bg-surface p-2.5 text-xs">
+                            <span className="font-semibold text-text truncate max-w-[110px]">{req.name}</span>
                             <div className="flex gap-1">
                               {!isGranted ? (
                                 <button
                                   onClick={() => setGrantedSpeakers((prev) => [...prev, req.id])}
-                                  className="rounded-lg bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white hover:bg-emerald-500"
+                                  className="rounded-lg bg-online px-2 py-1 text-[10px] font-bold text-on-accent hover:bg-online/90"
                                 >
                                   발언 허용
                                 </button>
                               ) : (
                                 <button
                                   onClick={() => setGrantedSpeakers((prev) => prev.filter((i) => i !== req.id))}
-                                  className="rounded-lg bg-rose-600/30 text-rose-300 border border-rose-500/30 px-2 py-1 text-[10px] font-bold hover:bg-rose-600 hover:text-white"
+                                  className="rounded-lg bg-danger/30 text-danger border border-danger/30 px-2 py-1 text-[10px] font-bold hover:bg-danger hover:text-on-accent"
                                 >
                                   회수
                                 </button>
@@ -674,16 +674,16 @@ export default function VoiceGrid() {
                 }
               }}
               title="전체화면 (Fullscreen)"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 transition"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-muted hover:bg-surface-2 transition"
             >
               <span>{isFullscreen ? "↙️" : "↗️"}</span>
             </button>
 
-            <div className="h-5 w-px bg-white/10" />
+            <div className="h-5 w-px bg-surface-2" />
 
             <button
               onClick={leaveVoiceChannel}
-              className="flex h-9 items-center gap-1.5 rounded-full bg-red-600 px-4 text-xs font-bold text-white shadow-lg shadow-red-600/20 hover:bg-red-500 active:scale-95"
+              className="flex h-9 items-center gap-1.5 rounded-full bg-danger px-4 text-xs font-bold text-on-accent shadow-lg shadow-[0_4px_12px_-2px_var(--danger)] hover:bg-danger/90 active:scale-95"
             >
               <PhoneOff className="h-3.5 w-3.5" /> Leave
             </button>

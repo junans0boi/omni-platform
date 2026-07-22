@@ -21,14 +21,14 @@ export default function ClaimPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-4 text-zinc-100">
-      <section className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-8">
+    <main className="flex min-h-screen items-center justify-center bg-bg px-4 text-text">
+      <section className="w-full max-w-md rounded-2xl border border-line bg-surface p-8">
         <h1 className="text-2xl font-bold">Claim or reset your account</h1>
-        <p className="mt-2 text-sm text-zinc-400">
+        <p className="mt-2 text-sm text-muted">
           Use the verified email you control. Existing passwords are never copied.
         </p>
         {sent ? (
-          <p className="mt-6 rounded-lg bg-emerald-500/10 p-3 text-sm text-emerald-300">
+          <p className="mt-6 rounded-lg bg-online/10 p-3 text-sm text-online">
             If an eligible account exists, a recovery link has been sent.
           </p>
         ) : (
@@ -39,15 +39,15 @@ export default function ClaimPage() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="name@example.com"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3"
+              className="w-full rounded-lg border border-line bg-surface px-4 py-3"
             />
-            {error && <p className="text-sm text-red-300">{error}</p>}
-            <button className="w-full rounded-lg bg-indigo-600 py-3 font-semibold" type="submit">
+            {error && <p className="text-sm text-danger">{error}</p>}
+            <button className="w-full rounded-lg bg-accent py-3 font-semibold text-on-accent" type="submit">
               Send recovery link
             </button>
           </form>
         )}
-        <Link className="mt-6 inline-block text-sm text-indigo-300" href="/login">Back to login</Link>
+        <Link className="mt-6 inline-block text-sm text-accent" href="/login">Back to login</Link>
       </section>
     </main>
   );

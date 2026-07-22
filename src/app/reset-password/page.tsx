@@ -29,8 +29,8 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-4 text-zinc-100">
-      <form className="w-full max-w-md space-y-4 rounded-2xl border border-white/10 bg-white/5 p-8" onSubmit={submit}>
+    <main className="flex min-h-screen items-center justify-center bg-bg px-4 text-text">
+      <form className="w-full max-w-md space-y-4 rounded-2xl border border-line bg-surface p-8" onSubmit={submit}>
         <h1 className="text-2xl font-bold">Set a new password</h1>
         <input
           type="password"
@@ -40,10 +40,10 @@ export default function ResetPasswordPage() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           placeholder="New password"
-          className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3"
+          className="w-full rounded-lg border border-line bg-surface-2 px-4 py-3"
         />
-        {error && <p className="text-sm text-red-300">{error}</p>}
-        <button className="w-full rounded-lg bg-indigo-600 py-3 font-semibold" type="submit">
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <button className="w-full rounded-lg bg-accent text-on-accent py-3 font-semibold" type="submit">
           Save password
         </button>
       </form>

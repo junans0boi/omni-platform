@@ -20,7 +20,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { name, mode } = await req.json();
+    const { name, mode, isPrivate } = await req.json();
 
     const channel = await prisma.channel.findFirst({
       where: { id: channelId, spaceId },
@@ -35,6 +35,7 @@ export async function PATCH(
       data: {
         ...(name && typeof name === "string" ? { name: name.trim() } : {}),
         ...(mode && typeof mode === "string" ? { mode: mode.toUpperCase() } : {}),
+        ...(typeof isPrivate === "boolean" ? { isPrivate } : {}),
       },
     });
 

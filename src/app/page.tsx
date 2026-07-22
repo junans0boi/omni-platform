@@ -24,10 +24,10 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-[#09090b] text-white">
+    <div className="flex h-screen w-screen items-center justify-center bg-bg text-text">
       <div className="flex flex-col items-center gap-4">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
-        <p className="text-sm font-semibold text-zinc-300">{t("landing.loading")}</p>
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-accent border-t-transparent" />
+        <p className="text-sm font-semibold text-muted">{t("landing.loading")}</p>
       </div>
     </div>
   );

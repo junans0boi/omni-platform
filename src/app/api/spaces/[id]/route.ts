@@ -16,13 +16,16 @@ export async function GET(
   const { id: spaceId } = await params;
 
   try {
-    // Verify membership
+    // Verify membership with membershipRoles for channel override checking
     const isMember = await prisma.member.findUnique({
       where: {
         spaceId_profileId: {
           spaceId,
           profileId: user.id,
         },
+      },
+      include: {
+        membershipRoles: { select: { roleId: true } },
       },
     });
 
@@ -35,14 +38,28 @@ export async function GET(
       orderBy: { position: "asc" },
     });
 
-    const channels = await prisma.channel.findMany({
+    const rawChannels = await prisma.channel.findMany({
       where: { spaceId },
+      include: { overrides: true },
       orderBy: { position: "asc" },
+    });
+
+    const memberRoleIds = isMember.membershipRoles.map((mr) => mr.roleId);
+
+    // Filter private channels: OWNER can see all, ADMIN/MEMBER only if in overrides
+    const channels = rawChannels.filter((ch) => {
+      if (!ch.isPrivate) return true;
+      if (isMember.role === "OWNER") return true;
+      if (!ch.overrides || ch.overrides.length === 0) return false;
+      return ch.overrides.some(
+        (o) => (o.profileId && o.profileId === user.id) || (o.roleId && memberRoleIds.includes(o.roleId))
+      );
     });
 
     const members = await prisma.member.findMany({
       where: { spaceId },
       include: {
+        membershipRoles: { include: { role: true } },
         profile: {
           select: {
             id: true,
@@ -104,6 +121,63 @@ export async function DELETE(
     });
 
     return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
+  }
+}
+
+// PATCH: Update space profile (name, avatarUrl)
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id: spaceId } = await params;
+
+  try {
+    const member = await prisma.member.findUnique({
+      where: {
+        spaceId_profileId: {
+          spaceId,
+          profileId: user.id,
+        },
+      },
+    });
+
+    if (!member || !["OWNER", "ADMIN"].includes(member.role)) {
+      return NextResponse.json({ error: "Forbidden: Owner or Admin permissions required" }, { status: 403 });
+    }
+
+    const { name, avatarUrl } = await req.json();
+
+    const updatedSpace = await prisma.space.update({
+      where: { id: spaceId },
+      data: {
+        ...(typeof name === "string" && name.trim() ? { name: name.trim() } : {}),
+        ...(avatarUrl !== undefined ? { avatarUrl: avatarUrl || null } : {}),
+      },
+    });
+
+    // Notify all space members in real-time
+    const { messageBroker } = await import("@/lib/events");
+    const spaceMembers = await prisma.member.findMany({
+      where: { spaceId },
+      select: { profileId: true },
+    });
+
+    for (const m of spaceMembers) {
+      messageBroker.emit(`user:${m.profileId}`, {
+        type: "space:updated",
+        spaceId,
+        space: updatedSpace,
+      });
+    }
+
+    return NextResponse.json(updatedSpace);
   } catch (error: unknown) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }

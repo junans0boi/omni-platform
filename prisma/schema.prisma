@@ -61,6 +61,7 @@ model Space {
   channels   Channel[]
   members    Member[]
   roles      Role[]
+  auditLogs  AuditLog[]
 }
 
 model Category {
@@ -74,17 +75,44 @@ model Category {
 }
 
 model Channel {
-  id         String    @id @default(uuid())
+  id         String            @id @default(uuid())
   spaceId    String
-  space      Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  space      Space             @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   categoryId String?
-  category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category   Category?         @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   name       String
-  type       String    @default("TEXT") // TEXT, VOICE, STAGE
-  mode       String    @default("GENERAL") // GENERAL, MEETING, LECTURE
-  position   Int       @default(0)
-  createdAt  DateTime  @default(now())
+  type       String            @default("TEXT") // TEXT, VOICE, STAGE
+  mode       String            @default("GENERAL") // GENERAL, MEETING, LECTURE
+  isPrivate  Boolean           @default(false)
+  position   Int               @default(0)
+  createdAt  DateTime          @default(now())
   messages   Message[]
+  overrides  ChannelOverride[]
+}
+
+model ChannelOverride {
+  id        String   @id @default(uuid())
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  roleId    String?
+  profileId String?
+  createdAt DateTime @default(now())
+
+  @@index([channelId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  spaceId    String
+  space      Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  actorId    String
+  actorName  String
+  action     String   // ROLE_CREATE, ROLE_UPDATE, MEMBER_KICK, MEMBER_ROLE_UPDATE, CHANNEL_CREATE, CHANNEL_DELETE, SPACE_UPDATE
+  targetName String?
+  details    String?
+  createdAt  DateTime @default(now())
+
+  @@index([spaceId, createdAt])
 }
 
 model Member {
@@ -229,6 +257,7 @@ model DirectParticipant {
   conversation   DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   profileId      String
   profile        Profile            @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime           @default(now())
   createdAt      DateTime           @default(now())
 
   @@unique([conversationId, profileId])
@@ -280,6 +309,10 @@ model UserPreference {
   // Language & Time
   locale               String   @default("ko")
   timeFormat           String   @default("auto")
+
+  // Appearance
+  themeName            String   @default("default")
+  themeMode            String   @default("dark")
 
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

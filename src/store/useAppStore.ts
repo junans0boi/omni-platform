@@ -40,6 +40,7 @@ export interface Channel {
   name: string;
   type: "TEXT" | "VOICE" | "STAGE";
   mode?: "GENERAL" | "MEETING" | "LECTURE" | string;
+  isPrivate?: boolean;
   position: number;
 }
 
@@ -49,6 +50,7 @@ export interface Member {
   profileId: string;
   role: "OWNER" | "ADMIN" | "MEMBER";
   profile?: Profile;
+  membershipRoles?: Array<{ roleId: string; role: { id: string; name: string; colorHex: string | null } }>;
 }
 
 export interface Reaction {
@@ -150,12 +152,17 @@ interface AppState {
   isLoadingOlderMessages: boolean;
   activeSpaceId: string | null;
   activeChannelId: string | null;
+  activeDmConversationId: string | null;
   presenceUsers: PresenceSnapshot;
   isLoading: boolean;
 
   // New states
   theme: "light" | "dark";
+  themeName: "default" | "transmission" | "night-signal";
   unreadBadges: Record<string, number>;
+  dmUnreadBadges: Record<string, number>;
+  pendingFriendRequestCount: number;
+  friendsSyncTick: number;
 
   // Voice/Video States
   activeVoiceChannelId: string | null;
@@ -165,6 +172,7 @@ interface AppState {
   isScreenSharing: boolean;
 
   setTheme: (theme: "light" | "dark") => void;
+  setThemeName: (themeName: "default" | "transmission" | "night-signal") => void;
   setProfile: (profile: Profile | null) => void;
   fetchSpaces: () => Promise<void>;
   fetchSpaceData: (spaceId: string) => Promise<void>;
@@ -180,8 +188,13 @@ interface AppState {
   toggleReaction: (channelId: string, msgId: string, emoji: string) => Promise<void>;
   setActiveSpaceId: (spaceId: string | null) => void;
   setActiveChannelId: (channelId: string | null) => void;
+  setActiveDmConversationId: (conversationId: string | null) => void;
   setPresenceUsers: (users: PresenceSnapshot) => void;
   clearUnreadBadge: (channelId: string) => void;
+  applyDirectMessageEvent: (conversationId: string, isActiveConversation: boolean) => void;
+  applyFriendshipEvent: () => void;
+  clearDmUnread: (conversationId: string) => void;
+  setPendingFriendRequestCount: (n: number) => void;
 
   // Voice/Video Actions
   joinVoiceChannel: (channelId: string) => Promise<void>;
@@ -202,10 +215,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   isLoadingOlderMessages: false,
   activeSpaceId: null,
   activeChannelId: null,
+  activeDmConversationId: null,
   presenceUsers: {},
   isLoading: false,
   theme: "dark",
+  themeName: "default",
   unreadBadges: {},
+  dmUnreadBadges: {},
+  pendingFriendRequestCount: 0,
+  friendsSyncTick: 0,
 
   // Voice/Video initial states
   activeVoiceChannelId: null,
@@ -215,6 +233,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isScreenSharing: false,
 
   setTheme: (theme) => set({ theme }),
+  setThemeName: (themeName) => set({ themeName }),
   setProfile: (profile) => set({
     profile,
     unreadBadges: profile ? loadUnreadBadges(profile.id) : {},
@@ -295,12 +314,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const isActiveChannel = message.channelId === state.activeChannelId;
 
-      // Handle delete event
-      if ("_type" in message && message._type === "DELETE") {
+      // Handle delete event or deletedAt update
+      if (
+        ("_type" in message && message._type === "DELETE") ||
+        ("deletedAt" in message && Boolean(message.deletedAt))
+      ) {
         if (!isActiveChannel) return state;
         return { messages: state.messages.filter((m) => m.id !== message.id) };
       }
-      
+
       // Handle update event
       if ("_type" in message && message._type === "UPDATE") {
         if (!isActiveChannel) return state;
@@ -337,6 +359,33 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { unreadBadges };
     });
   },
+
+  applyDirectMessageEvent: (conversationId, isActiveConversation) => {
+    set((state) => {
+      if (isActiveConversation) return { friendsSyncTick: state.friendsSyncTick + 1 };
+      return {
+        dmUnreadBadges: {
+          ...state.dmUnreadBadges,
+          [conversationId]: (state.dmUnreadBadges[conversationId] || 0) + 1,
+        },
+        friendsSyncTick: state.friendsSyncTick + 1,
+      };
+    });
+  },
+
+  applyFriendshipEvent: () => {
+    set((state) => ({ friendsSyncTick: state.friendsSyncTick + 1 }));
+  },
+
+  clearDmUnread: (conversationId) => {
+    set((state) => {
+      const dmUnreadBadges = { ...state.dmUnreadBadges };
+      delete dmUnreadBadges[conversationId];
+      return { dmUnreadBadges };
+    });
+  },
+
+  setPendingFriendRequestCount: (n) => set({ pendingFriendRequestCount: n }),
 
   createSpace: async (name, avatarUrl) => {
     try {
@@ -456,6 +505,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     latestMessageFetch += 1;
     set({ activeChannelId: channelId, messages: [], messageHistoryCursor: null });
     if (channelId) get().clearUnreadBadge(channelId);
+  },
+  setActiveDmConversationId: (conversationId) => {
+    set({ activeDmConversationId: conversationId });
+    if (conversationId) get().clearDmUnread(conversationId);
   },
   setPresenceUsers: (presenceUsers) => set({ presenceUsers }),
 

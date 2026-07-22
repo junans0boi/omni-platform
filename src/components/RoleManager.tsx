@@ -153,33 +153,33 @@ export function RoleManager({ spaceId }: { spaceId: string }) {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-950 p-6 text-zinc-100">
+    <main className="min-h-screen bg-surface p-6 text-text">
       <div className="mx-auto max-w-5xl">
-        <Link className="text-sm text-indigo-300 hover:text-indigo-200" href="/dashboard">← Back to dashboard</Link>
+        <Link className="text-sm text-accent hover:text-accent-strong" href="/dashboard">← Back to dashboard</Link>
         <h1 className="mt-4 text-3xl font-bold">Roles and permissions</h1>
-        <p className="mt-2 text-zinc-400">Permissions are additive. Space owners always retain full authority.</p>
-        {error && <div role="alert" className="mt-4 rounded-lg border border-red-500/40 bg-red-950/50 p-3 text-red-200">{error}</div>}
+        <p className="mt-2 text-muted">Permissions are additive. Space owners always retain full authority.</p>
+        {error && <div role="alert" className="mt-4 rounded-lg border border-danger/40 bg-danger/10 p-3 text-danger">{error}</div>}
 
         {data?.canManageRoles && (
-          <form onSubmit={createRole} className="mt-8 rounded-xl border border-white/10 bg-white/5 p-5">
+          <form onSubmit={createRole} className="mt-8 rounded-xl border border-line bg-surface p-5">
             <h2 className="text-xl font-semibold">Create role</h2>
             <label className="mt-4 block text-sm" htmlFor="role-name">Role name</label>
             <input id="role-name" value={name} onChange={(event) => setName(event.target.value)} required maxLength={50}
-              className="mt-1 w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2" />
+              className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2" />
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <label className="text-sm">Color
                 <input type="color" value={colorHex} onChange={(event) => setColorHex(event.target.value.toUpperCase())}
-                  className="mt-1 block h-10 w-full rounded border border-white/15 bg-black/30" />
+                  className="mt-1 block h-10 w-full rounded border border-line bg-surface-2" />
               </label>
               <label className="text-sm">Badge
-                <select value={badgeKey} onChange={(event) => setBadgeKey(event.target.value)} className="mt-1 block h-10 w-full rounded border border-white/15 bg-zinc-900 px-2">
+                <select value={badgeKey} onChange={(event) => setBadgeKey(event.target.value)} className="mt-1 block h-10 w-full rounded border border-line bg-surface px-2">
                   <option value="">No badge</option>
                   {ROLE_BADGES.map((badge) => <option key={badge} value={badge}>{badge}</option>)}
                 </select>
               </label>
               <label className="text-sm">Display position
                 <input type="number" value={position} onChange={(event) => setPosition(Number(event.target.value))}
-                  className="mt-1 block h-10 w-full rounded border border-white/15 bg-black/30 px-2" />
+                  className="mt-1 block h-10 w-full rounded border border-line bg-surface-2 px-2" />
               </label>
             </div>
             <fieldset className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -191,7 +191,7 @@ export function RoleManager({ spaceId }: { spaceId: string }) {
                 </label>
               ))}
             </fieldset>
-            <button className="mt-5 rounded-lg bg-indigo-600 px-4 py-2 font-semibold hover:bg-indigo-500">Create role</button>
+            <button className="mt-5 rounded-lg bg-accent px-4 py-2 font-semibold text-on-accent hover:bg-accent-strong">Create role</button>
           </form>
         )}
 
@@ -199,23 +199,23 @@ export function RoleManager({ spaceId }: { spaceId: string }) {
           {data?.roles.map((role) => {
             const granted = new Set(role.permissions.map(({ permission }) => permission));
             return (
-              <article key={role.id} className="rounded-xl border border-white/10 bg-white/5 p-5">
+              <article key={role.id} className="rounded-xl border border-line bg-surface p-5">
                 <div className="flex items-center justify-between gap-4">
                   <h2 className="text-xl font-semibold" style={{ color: role.colorHex ?? undefined }}>
-                    {role.name}{role.badgeKey && <span className="ml-2 text-xs text-zinc-300" aria-label={`${role.badgeKey} badge`}>[{role.badgeKey}]</span>}
+                    {role.name}{role.badgeKey && <span className="ml-2 text-xs text-muted" aria-label={`${role.badgeKey} badge`}>[{role.badgeKey}]</span>}
                   </h2>
-                  {data.canManageRoles && <button onClick={() => void deleteRole(role.id)} className="text-sm text-red-300">Delete role</button>}
+                  {data.canManageRoles && <button onClick={() => void deleteRole(role.id)} className="text-sm text-danger">Delete role</button>}
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   <label className="text-sm">Color
                     <input type="color" defaultValue={role.colorHex ?? "#A1A1AA"} disabled={!data.canManageRoles}
                       onBlur={(event) => void updateRole(role, [...granted], { colorHex: event.currentTarget.value.toUpperCase() })}
-                      className="mt-1 block h-9 w-full rounded border border-white/15 bg-black/30" />
+                      className="mt-1 block h-9 w-full rounded border border-line bg-surface-2" />
                   </label>
                   <label className="text-sm">Badge
                     <select defaultValue={role.badgeKey ?? ""} disabled={!data.canManageRoles}
                       onChange={(event) => void updateRole(role, [...granted], { badgeKey: event.target.value || null })}
-                      className="mt-1 block h-9 w-full rounded border border-white/15 bg-zinc-900 px-2">
+                      className="mt-1 block h-9 w-full rounded border border-line bg-surface px-2">
                       <option value="">No badge</option>
                       {ROLE_BADGES.map((badge) => <option key={badge} value={badge}>{badge}</option>)}
                     </select>
@@ -223,7 +223,7 @@ export function RoleManager({ spaceId }: { spaceId: string }) {
                   <label className="text-sm">Display position
                     <input type="number" defaultValue={role.position} disabled={!data.canManageRoles}
                       onBlur={(event) => void updateRole(role, [...granted], { position: Number(event.currentTarget.value) })}
-                      className="mt-1 block h-9 w-full rounded border border-white/15 bg-black/30 px-2" />
+                      className="mt-1 block h-9 w-full rounded border border-line bg-surface-2 px-2" />
                   </label>
                 </div>
                 <fieldset className="mt-4 grid gap-2 sm:grid-cols-2" disabled={!data.canManageRoles}>
@@ -255,7 +255,7 @@ export function RoleManager({ spaceId }: { spaceId: string }) {
               </article>
             );
           })}
-          {data && data.roles.length === 0 && <p className="text-zinc-400">No custom roles yet.</p>}
+          {data && data.roles.length === 0 && <p className="text-muted">No custom roles yet.</p>}
         </section>
       </div>
     </main>

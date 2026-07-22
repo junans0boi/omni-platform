@@ -120,6 +120,18 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    if (!isMessageAuthor) {
+      const { createAuditLog } = await import("@/lib/audit");
+      await createAuditLog({
+        spaceId: message.channel.spaceId,
+        actorId: user.id,
+        actorName: user.displayName || user.username,
+        action: "MANAGE_MESSAGES",
+        targetName: `Message in #${message.channel.name}`,
+        details: `Deleted message in #${message.channel.name}`,
+      });
+    }
+
     const deleted = await prisma.message.update({
       where: { id: msgId },
       data: { content: "", deletedAt: new Date() },
@@ -139,8 +151,8 @@ export async function DELETE(
       },
     });
 
-    // Notify listeners via Event Broker
-    messageBroker.emit(`message:${channelId}`, { ...deleted, _type: "UPDATE" });
+    // Notify listeners via Event Broker with _type: DELETE
+    messageBroker.emit(`message:${channelId}`, { id: msgId, channelId, _type: "DELETE" });
 
     return NextResponse.json(deleted);
   } catch (error: unknown) {

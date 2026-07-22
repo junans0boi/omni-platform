@@ -129,53 +129,53 @@ export default function HomePage() {
   const incoming = friendships.filter(({ status, direction }) => status === "PENDING" && direction === "incoming");
 
   return (
-    <main className="flex min-h-screen bg-[#09090b] text-zinc-100">
-      <aside className="flex w-80 shrink-0 flex-col border-r border-white/10 bg-[#111113]">
-        <header className="flex h-14 items-center gap-3 border-b border-white/10 px-4">
-          <Link href="/dashboard" aria-label="Back to Spaces" className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white"><ArrowLeft className="h-4 w-4" /></Link>
+    <main className="flex min-h-screen bg-bg text-text">
+      <aside className="flex w-80 shrink-0 flex-col border-r border-line bg-surface">
+        <header className="flex h-14 items-center gap-3 border-b border-line px-4">
+          <Link href="/dashboard" aria-label="Back to Spaces" className="rounded-lg p-2 text-muted hover:bg-surface-2 hover:text-text"><ArrowLeft className="h-4 w-4" /></Link>
           <h1 className="font-bold">Home</h1>
         </header>
-        <form onSubmit={requestFriend} className="flex gap-2 border-b border-white/10 p-3">
+        <form onSubmit={requestFriend} className="flex gap-2 border-b border-line p-3">
           <label className="sr-only" htmlFor="friend-username">Friend username</label>
-          <input id="friend-username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Add by username" className="min-w-0 flex-1 rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm outline-hidden focus:border-blue-500" />
-          <button aria-label="Send friend request" className="rounded-lg bg-blue-600 p-2 hover:bg-blue-500"><UserPlus className="h-4 w-4" /></button>
+          <input id="friend-username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Add by username" className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-hidden focus:border-accent" />
+          <button aria-label="Send friend request" className="rounded-lg bg-accent p-2 text-on-accent hover:bg-accent-strong"><UserPlus className="h-4 w-4" /></button>
         </form>
-        {incoming.length > 0 && <section aria-label="Incoming friend requests" className="border-b border-white/10 p-3">
-          <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-500">Requests</h2>
+        {incoming.length > 0 && <section aria-label="Incoming friend requests" className="border-b border-line p-3">
+          <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">Requests</h2>
           {incoming.map((friendship) => <div key={friendship.id} className="flex items-center gap-2 py-1 text-sm">
             <span className="min-w-0 flex-1 truncate">@{friendship.profile.username}</span>
-            <button aria-label={`Accept ${friendship.profile.username}`} onClick={() => changeFriendship(friendship.id, "accept")} className="rounded p-1 text-emerald-400 hover:bg-emerald-500/10"><Check className="h-4 w-4" /></button>
-            <button aria-label={`Decline ${friendship.profile.username}`} onClick={() => changeFriendship(friendship.id, "decline")} className="rounded p-1 text-red-400 hover:bg-red-500/10"><X className="h-4 w-4" /></button>
+            <button aria-label={`Accept ${friendship.profile.username}`} onClick={() => changeFriendship(friendship.id, "accept")} className="rounded p-1 text-online hover:bg-online/10"><Check className="h-4 w-4" /></button>
+            <button aria-label={`Decline ${friendship.profile.username}`} onClick={() => changeFriendship(friendship.id, "decline")} className="rounded p-1 text-danger hover:bg-danger/10"><X className="h-4 w-4" /></button>
           </div>)}
         </section>}
         <nav aria-label="Direct conversations" className="flex-1 overflow-y-auto p-2">
-          <h2 className="px-2 py-2 text-xs font-bold uppercase tracking-wide text-zinc-500">Direct messages</h2>
-          {conversations.map((conversation) => <button key={conversation.id} onClick={() => setActiveConversationId(conversation.id)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left ${activeConversationId === conversation.id ? "bg-white/10 text-white" : "text-zinc-400 hover:bg-white/5"}`}>
+          <h2 className="px-2 py-2 text-xs font-bold uppercase tracking-wide text-muted">Direct messages</h2>
+          {conversations.map((conversation) => <button key={conversation.id} onClick={() => setActiveConversationId(conversation.id)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left ${activeConversationId === conversation.id ? "bg-surface-2 text-text" : "text-muted hover:bg-surface-2"}`}>
             <MessageCircle className="h-4 w-4" /><span className="truncate">{conversation.profile?.displayName || conversation.profile?.username}</span>
           </button>)}
-          {!conversations.length && <p className="px-3 py-8 text-center text-sm text-zinc-600">Accept a friend request to start a DM.</p>}
+          {!conversations.length && <p className="px-3 py-8 text-center text-sm text-muted">Accept a friend request to start a DM.</p>}
         </nav>
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">
         {activeConversation ? <>
-          <header className="flex h-14 items-center justify-between border-b border-white/10 px-5">
-            <div className="flex items-center gap-2"><Users className="h-4 w-4 text-zinc-500" /><strong>{activeConversation.profile?.displayName || activeConversation.profile?.username}</strong></div>
-            <button aria-label={`Block ${activeConversation.profile?.username}`} onClick={() => changeFriendship(activeConversation.friendshipId, activeConversation.blockedByMe ? "unblock" : "block")} className="rounded-lg p-2 text-zinc-500 hover:bg-red-500/10 hover:text-red-400"><ShieldBan className="h-4 w-4" /></button>
+          <header className="flex h-14 items-center justify-between border-b border-line px-5">
+            <div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted" /><strong>{activeConversation.profile?.displayName || activeConversation.profile?.username}</strong></div>
+            <button aria-label={`Block ${activeConversation.profile?.username}`} onClick={() => changeFriendship(activeConversation.friendshipId, activeConversation.blockedByMe ? "unblock" : "block")} className="rounded-lg p-2 text-muted hover:bg-danger/10 hover:text-danger"><ShieldBan className="h-4 w-4" /></button>
           </header>
           <div aria-label="Direct message history" className="flex-1 space-y-4 overflow-y-auto p-6">
             {messages.map((item) => <article key={item.id} className="flex gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold uppercase">{item.profile.username.slice(0, 2)}</div>
-              <div><strong className="text-sm">{item.profile.displayName || item.profile.username}</strong><p className="whitespace-pre-wrap text-sm text-zinc-300">{item.content}</p></div>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-bold uppercase">{item.profile.username.slice(0, 2)}</div>
+              <div><strong className="text-sm">{item.profile.displayName || item.profile.username}</strong><p className="whitespace-pre-wrap text-sm text-text">{item.content}</p></div>
             </article>)}
           </div>
           {activeConversation.friendshipStatus === "ACCEPTED" ? <form onSubmit={sendMessage} className="flex gap-2 p-4">
             <label className="sr-only" htmlFor="direct-message">Direct message</label>
-            <input id="direct-message" value={message} onChange={(event) => setMessage(event.target.value)} placeholder={`Message @${activeConversation.profile?.username}`} className="min-w-0 flex-1 rounded-xl border border-white/10 bg-zinc-900 px-4 py-3 outline-hidden focus:border-blue-500" />
-            <button aria-label="Send direct message" className="rounded-xl bg-blue-600 px-4 hover:bg-blue-500"><Send className="h-4 w-4" /></button>
-          </form> : <p role="status" className="border-t border-white/10 p-4 text-center text-sm text-zinc-500">History is retained, but new messages are disabled until this friendship is accepted.</p>}
-        </> : <div className="flex flex-1 flex-col items-center justify-center text-zinc-600"><MessageCircle className="mb-3 h-12 w-12 stroke-1" /><p>Select a conversation or add a friend.</p></div>}
-        {error && <div role="alert" className="fixed bottom-4 right-4 rounded-lg border border-red-500/30 bg-red-950 px-4 py-3 text-sm text-red-300">{error}</div>}
+            <input id="direct-message" value={message} onChange={(event) => setMessage(event.target.value)} placeholder={`Message @${activeConversation.profile?.username}`} className="min-w-0 flex-1 rounded-xl border border-line bg-surface px-4 py-3 outline-hidden focus:border-accent" />
+            <button aria-label="Send direct message" className="rounded-xl bg-accent px-4 text-on-accent hover:bg-accent-strong"><Send className="h-4 w-4" /></button>
+          </form> : <p role="status" className="border-t border-line p-4 text-center text-sm text-muted">History is retained, but new messages are disabled until this friendship is accepted.</p>}
+        </> : <div className="flex flex-1 flex-col items-center justify-center text-muted"><MessageCircle className="mb-3 h-12 w-12 stroke-1" /><p>Select a conversation or add a friend.</p></div>}
+        {error && <div role="alert" className="fixed bottom-4 right-4 rounded-lg border border-danger/30 bg-danger/20 px-4 py-3 text-sm text-danger">{error}</div>}
       </section>
     </main>
   );

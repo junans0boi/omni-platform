@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { decideFriendshipTransition, directMessagingError, type FriendshipAction } from "@/lib/direct-messaging";
 import { prisma } from "@/lib/prisma";
+import { messageBroker } from "@/lib/events";
 
 export async function PATCH(
   req: NextRequest,
@@ -43,6 +44,15 @@ export async function PATCH(
       ]);
       return { friendship: updated, conversationId: conversation.id };
     });
+
+    const otherPartyId =
+      friendship.profileAId === user.id ? friendship.profileBId : friendship.profileAId;
+    messageBroker.emit(`user:${otherPartyId}`, {
+      type: "friend-request:updated",
+      friendshipId: id,
+      status: result.friendship.status,
+    });
+
     return NextResponse.json(result);
   } catch (error) {
     const response = directMessagingError(error);

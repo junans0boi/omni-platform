@@ -135,4 +135,48 @@ export const useRealtime = () => {
       setPresenceUsers({});
     };
   }, [activeSpaceId, profile, setPresenceUsers]);
+
+  // Per-user stream: DM new-message pushes and friend-request events.
+  useEffect(() => {
+    if (!profile) return;
+
+    const eventSource = new EventSource("/api/users/me/stream");
+
+    eventSource.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as {
+          type?: string;
+          conversationId?: string;
+        };
+        if (payload.type === "dm:new" && typeof payload.conversationId === "string") {
+          const activeDmId = useAppStore.getState().activeDmConversationId;
+          const isActive = payload.conversationId === activeDmId;
+          useAppStore.getState().applyDirectMessageEvent(payload.conversationId, isActive);
+          if (!isActive) {
+            getSoundEffects()?.emit("INACTIVE_MESSAGE");
+          }
+        } else if (
+          payload.type === "friend-request:new" ||
+          payload.type === "friend-request:updated"
+        ) {
+          useAppStore.getState().applyFriendshipEvent();
+          if (payload.type === "friend-request:new") {
+            getSoundEffects()?.emit("INACTIVE_MESSAGE");
+          }
+        } else if (payload.type === "space:updated") {
+          useAppStore.getState().fetchSpaces();
+          const activeSpaceId = useAppStore.getState().activeSpaceId;
+          if (activeSpaceId) {
+            useAppStore.getState().fetchSpaceData(activeSpaceId);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to parse user SSE payload:", error);
+      }
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [profile]);
 };

@@ -41,6 +41,33 @@ const messageInclude = {
   },
 };
 
+async function assertChannelAccess(user: { id: string }, channel: { id: string; spaceId: string; isPrivate: boolean }) {
+  const member = await prisma.member.findUnique({
+    where: { spaceId_profileId: { spaceId: channel.spaceId, profileId: user.id } },
+    include: { membershipRoles: { select: { roleId: true } } },
+  });
+  if (!member) return { ok: false as const, status: 403, error: "Forbidden" };
+
+  if (channel.isPrivate) {
+    if (member.role === "OWNER") return { ok: true as const, member };
+
+    const overrides = await prisma.channelOverride.findMany({
+      where: { channelId: channel.id },
+    });
+
+    const memberRoleIds = member.membershipRoles.map((mr) => mr.roleId);
+    const hasAccess = overrides.some(
+      (o) => (o.profileId && o.profileId === user.id) || (o.roleId && memberRoleIds.includes(o.roleId))
+    );
+
+    if (!hasAccess) {
+      return { ok: false as const, status: 403, error: "Forbidden: Private channel access required" };
+    }
+  }
+
+  return { ok: true as const, member };
+}
+
 // GET: fetch messages for the channel
 export async function GET(
   req: NextRequest,
@@ -62,18 +89,10 @@ export async function GET(
       return NextResponse.json({ error: "Channel not found" }, { status: 404 });
     }
 
-    // Verify space membership
-    const isMember = await prisma.member.findUnique({
-      where: {
-        spaceId_profileId: {
-          spaceId: channel.spaceId,
-          profileId: user.id,
-        },
-      },
-    });
-
-    if (!isMember) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Verify space membership & private channel access
+    const access = await assertChannelAccess(user, channel);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
     const limit = clampMessagePageLimit(req.nextUrl.searchParams.get("limit"));
@@ -158,17 +177,9 @@ export async function POST(
       return NextResponse.json({ error: "Channel not found" }, { status: 404 });
     }
 
-    const isMember = await prisma.member.findUnique({
-      where: {
-        spaceId_profileId: {
-          spaceId: channel.spaceId,
-          profileId: user.id,
-        },
-      },
-    });
-
-    if (!isMember) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const access = await assertChannelAccess(user, channel);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
     const mentionDrafts: MentionDraft[] = [];

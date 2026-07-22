@@ -60,7 +60,12 @@ export async function PATCH(req: NextRequest) {
       alwaysPreviewVideo,
       locale,
       timeFormat,
+      themeName,
+      themeMode,
     } = body;
+
+    const VALID_THEME_NAMES = ["default", "transmission", "night-signal"];
+    const VALID_THEME_MODES = ["light", "dark"];
 
     const dataToUpdate: Record<string, unknown> = {};
 
@@ -86,6 +91,9 @@ export async function PATCH(req: NextRequest) {
 
     if (typeof locale === "string") dataToUpdate.locale = locale;
     if (typeof timeFormat === "string") dataToUpdate.timeFormat = timeFormat;
+
+    if (typeof themeName === "string" && VALID_THEME_NAMES.includes(themeName)) dataToUpdate.themeName = themeName;
+    if (typeof themeMode === "string" && VALID_THEME_MODES.includes(themeMode)) dataToUpdate.themeMode = themeMode;
 
     const preference = await prisma.userPreference.upsert({
       where: { profileId: user.id },

@@ -41,10 +41,10 @@ export default async function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#09090b] text-[#e4e4e7]">
+      <body className="min-h-full flex flex-col bg-bg text-text">
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{const saved=localStorage.getItem("omni-theme");const dark=saved?saved==="dark":!matchMedia("(prefers-color-scheme: light)").matches;document.documentElement.classList.toggle("dark",dark)}catch{}`,
+            __html: `try{const saved=localStorage.getItem("omni-theme");const dark=saved?saved==="dark":!matchMedia("(prefers-color-scheme: light)").matches;document.documentElement.classList.toggle("dark",dark);const savedName=localStorage.getItem("omni-theme-name");const validNames=["default","transmission","night-signal"];document.documentElement.setAttribute("data-theme-name",savedName&&validNames.includes(savedName)?savedName:"default")}catch{}`,
           }}
         />
         <I18nProvider locale={locale}>{children}</I18nProvider>

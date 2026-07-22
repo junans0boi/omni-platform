@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser, safeProfileSelect } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canonicalProfilePair, directMessagingError } from "@/lib/direct-messaging";
+import { messageBroker } from "@/lib/events";
 
 const friendshipInclude = {
   profileA: { select: safeProfileSelect },
@@ -65,6 +66,20 @@ export async function POST(req: NextRequest) {
           data: { ...pair, requestedById: user.id },
           include: friendshipInclude,
         });
+
+    messageBroker.emit(`user:${target.id}`, {
+      type: "friend-request:new",
+      friendship: {
+        id: friendship.id,
+        status: friendship.status,
+        direction: friendship.requestedById === target.id ? "outgoing" : "incoming",
+        blockedByMe: friendship.blockedById === target.id,
+        conversationId: friendship.conversation?.id ?? null,
+        profile: friendship.profileAId === target.id ? friendship.profileB : friendship.profileA,
+        updatedAt: friendship.updatedAt,
+      },
+    });
+
     return NextResponse.json(friendship, { status: 201 });
   } catch (error) {
     const response = directMessagingError(error);

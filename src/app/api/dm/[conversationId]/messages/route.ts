@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser, safeProfileSelect } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { messageBroker } from "@/lib/events";
 
 export async function GET(
   req: NextRequest,
@@ -76,6 +77,19 @@ export async function POST(
       profile: { select: safeProfileSelect },
     },
   });
+
+  messageBroker.emit(`direct-message:${conversationId}`, message);
+
+  const recipients = await prisma.directParticipant.findMany({
+    where: { conversationId, profileId: { not: user.id } },
+  });
+  for (const recipient of recipients) {
+    messageBroker.emit(`user:${recipient.profileId}`, {
+      type: "dm:new",
+      conversationId,
+      message,
+    });
+  }
 
   return NextResponse.json(message, { status: 201 });
 }

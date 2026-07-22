@@ -23,7 +23,7 @@ export interface SoundPreference {
 
 export const DEFAULT_SOUND_PREFERENCE: Readonly<SoundPreference> = Object.freeze({
   enabled: true,
-  masterVolume: 35,
+  masterVolume: 70,
 });
 
 export interface SoundPlayback {
@@ -172,7 +172,7 @@ export class WebAudioSoundBackend implements SoundEffectBackend {
 
     const startedAt = context.currentTime;
     const masterGain = context.createGain();
-    const effectiveVolume = Math.max(0.01, volume * 0.45);
+    const effectiveVolume = Math.max(0.01, volume);
     masterGain.gain.setValueAtTime(effectiveVolume, startedAt);
     masterGain.connect(context.destination);
 
