@@ -138,3 +138,28 @@
 - **인수 기준**:
   - 유저가 채널 또는 DM방 클릭(입장) 시 배지 카운트가 즉시 0으로 차감되어 소멸해야 함.
 
+---
+
+## 4. 음성 STT 파싱 및 AI 요약 영역 (Voice STT & AI Summary - Issue #64)
+
+### 🎫 Ticket [VOICE-STT-1]: Prisma DB 스키마 (`MeetingNote`, `TranscriptLog`) 구축 및 API 구현
+- **내용**: 회의록 기본 데이터, AI 요약본, JSON 안건/결정사항 및 발언자별 대화 로그(`TranscriptLog`)를 저장할 Prisma 스키마를 추가하고 CRUD REST API를 구축합니다.
+- **인수 기준**:
+  - `npx prisma db push` 성공 및 회의록 생성/조회 API가 200 OK를 반환해야 함.
+
+### 🎫 Ticket [VOICE-STT-2]: 멀티 AI 요약 라우터 엔진 (`ai-summary-router.ts`) 구축
+- **내용**: Gemini 2.5 Flash API를 1순위로 호출하고, Rate Limit(429) 발생 시 Groq / OpenRouter 무료 모델로 연쇄 폴백(Fallback)하는 라우팅 엔진 및 30분 단위 청크 요약 로직을 구현합니다.
+- **인수 기준**:
+  - 4시간 통화 분량(약 10만 토큰) 시뮬레이션 데이터 전송 시 에러 없이 최종 종합 요약 JSON이 리턴되어야 함.
+
+### 🎫 Ticket [VOICE-STT-3]: 클라이언트 백그라운드 STT 파싱 및 수집기 구축 (`VoiceGrid.tsx`)
+- **내용**: Web Speech API 기반 음성 수집기를 구현하여 음성/스테이지 채널 참가 중 마이크 입력 텍스트를 발언자 정보 및 타임스탬프와 함께 백그라운드에서 수집합니다.
+- **인수 기준**:
+  - 음성 채널 툴바의 "수업/회의 모드" 켜기 클릭 시 마이크 입력이 실시간 텍스트 로그 배열로 차곡차곡 수집되어야 함.
+
+### 🎫 Ticket [VOICE-STT-4]: 회의록 UI 탭 및 요약 리포트 카드 / 다운로드 구현 (`MeetingNotesModal.tsx`)
+- **내용**: 스페이스/채널 내 회의록 히스토리 패널 UI를 제작하고 요약 카드(전체 요약, 안건, 결정사항, Action Items, Q&A) 렌더링 및 `.txt` / `.md` 파일 다운로드를 지원합니다.
+- **인수 기준**:
+  - 회의 종료 시 생성된 요약본이 카드 형태로 깔끔하게 표시되고 대화록 다운로드 버튼 클릭 시 파일이 저장되어야 함.
+
+

@@ -13,6 +13,8 @@
 | **#27** | Feature | `FEAT-RICHMEDIA`: 풍부한 파일 업로드 및 링크 미리보기 | **CLOSED** | 2026-07-22 |
 | **#63** | Feature | `FEAT-REALTIME_SYNC_ENHANCEMENT`: 스페이스 프로필/메시지 실시간 삭제 및 인라인 역할 선택 UI 잘림 해결 | **CLOSED** | 2026-07-22 |
 
+| **#64** | Feature | `FEAT-VOICE_STT_SUMMARY`: 음성 채널 백그라운드 STT 파싱, 멀티 AI 요약 및 회의록 DB 저장/히스토리 탭 | **OPEN** | - |
+
 ---
 
 ## 📝 이슈별 세부 완료 작업 및 검증 이력

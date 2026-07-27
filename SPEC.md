@@ -134,3 +134,17 @@
 - **친구 요청 동기화**: 친구 요청 수신 시 '대기 중' 탭 및 사이드바 배지에 즉시 `+1` 반영. 수락 시 새로고침 없이 양쪽 유저의 '친구 목록/온라인' 탭으로 즉시 이동 및 DM 전송 버튼 활성화.
 - **배지 차감 (Clear)**: 유저가 해당 DM 메시지창 또는 채널에 진입(Mount) 시 읽지 않은 배지 카운트를 DB와 연동하여 0으로 자동 소멸.
 
+### 6.5 음성 채널 백그라운드 STT 파싱 및 멀티 AI 대화 요약 (Issue #64 Spec)
+- **백그라운드 STT 파싱**:
+  - Web Speech API (`webkitSpeechRecognition`)를 기반으로 음성/스테이지 채널 접속 유저의 마이크 음성을 실시간 백그라운드 텍스트 로그로 변환하여 수집.
+  - 시간대별 발언자 이름, 발언 내용 및 타임스탬프 저장.
+- **대용량(4시간+) 대응 멀티 AI 요약 라우터 엔진**:
+  - `Google Gemini 2.5 Flash Free Tier` 기본 사용 (1M 토큰 컨텍스트 크기로 4~8시간 통화 무제한 처리).
+  - 30분 단위 스마트 청크 분할(Chunking) & 2단계 종합 합성 요약 알고리즘 적용.
+  - Rate limit (429 Error) 발생 시 `Groq (Llama 3 / Gemma 2)` 및 `OpenRouter Free` 라우터로 자동 연쇄 폴백(Fallback).
+- **회의록 DB 저장 및 리포트 카드 UI**:
+  - Prisma `MeetingNote` & `TranscriptLog` 스키마 구축.
+  - 전체 요약(Summary), 주요 안건(Topics), 결정사항(Decisions), 실행 과제(Action Items), Q&A 구분 리포트 카드 제공.
+  - 음성 채널 툴바 및 스페이스 회의록 히스토리 패널 제공, 대화록 `.txt` / `.md` 다운로드 지원.
+
+
