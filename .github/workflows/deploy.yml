@@ -69,4 +69,9 @@ jobs:
               npx pm2 save
             fi
 
+            echo "🔒 Ensuring Caddy Automatic HTTPS (omni.steady2vivid.kro.kr)..."
+            if [ -f "./setup-caddy.sh" ]; then
+              bash ./setup-caddy.sh omni.steady2vivid.kro.kr || true
+            fi
+
             echo "🎉 Deployment completed successfully!"

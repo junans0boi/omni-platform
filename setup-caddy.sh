@@ -18,21 +18,28 @@ sudo apt update
 sudo apt install -y caddy
 
 echo "▶ [2/3] Configuring Caddyfile..."
-if [ -n "$DOMAIN" ]; then
-  sudo tee /etc/caddy/Caddyfile > /dev/null <<EOF
-$DOMAIN {
-    reverse_proxy localhost:3000
-}
-EOF
-else
-  sudo tee /etc/caddy/Caddyfile > /dev/null <<EOF
-:80 {
-    reverse_proxy localhost:3000
-}
-EOF
-fi
+TARGET_DOMAIN="${DOMAIN:-omni.steady2vivid.kro.kr}"
 
-echo "▶ [3/3] Restarting Caddy service..."
+sudo tee /etc/caddy/Caddyfile > /dev/null <<EOF
+$TARGET_DOMAIN {
+    encode zstd gzip
+
+    # Proxy WebSocket & HTTP requests to Next.js App
+    reverse_proxy localhost:3000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+EOF
+
+echo "▶ [3/3] Opening firewall ports (80/443)..."
+sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || true
+sudo iptables -I INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || true
+sudo netfilter-persistent save 2>/dev/null || true
+
+echo "▶ Restarting Caddy service..."
 sudo systemctl restart caddy
 sudo systemctl enable caddy
 
