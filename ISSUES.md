@@ -126,3 +126,8 @@ graph TD
 - **상태**: 🟡 진행 예정 (Open)
 - **설명**: 음성/수업 채널 백그라운드 STT 실시간 텍스트 파싱, Gemini 2.5 Flash / Groq 멀티 AI 요약 연동 및 회의록 DB 저장 및 히스토리 탭/다운로드 구현.
 
+#### **Issue #67: [AUTH-GOOGLE-1] 자체 백엔드(Prisma) 연동 Google OAuth 2.0 로그인 기능 추가**
+- **상태**: ✅ 완료 (Resolved)
+- **설명**: Supabase Auth 의존 없이 자체 백엔드(Prisma + Next.js Session) 환경에서 구글 계정으로 로그인 및 신규 계정 자동 생성을 지원하는 Google OAuth 2.0 연동 기능 구현.
+
+
