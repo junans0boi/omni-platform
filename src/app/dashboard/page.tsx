@@ -1384,7 +1384,7 @@ export default function DashboardPage() {
                   }}
                   onOpenFriends={() => setMainView("friends")}
                 />
-                <ChannelHeaderExtras messages={messages} />
+                <ChannelHeaderExtras messages={messages} channelId={activeChannel.id} />
                 <button
                   ref={memberDialogButtonRef}
                   onClick={() => setIsMemberDialogOpen(true)}

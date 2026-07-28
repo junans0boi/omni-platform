@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Pin, Image as ImageIcon, Bell, BellOff, X } from "lucide-react";
 
 interface Message {
   id: string;
   content: string;
   createdAt: string;
+  isPinned?: boolean;
   profile?: {
     username: string;
     displayName: string | null;
@@ -16,14 +17,44 @@ interface Message {
 
 export function ChannelHeaderExtras({
   messages,
+  channelId,
 }: {
   messages: Message[];
+  channelId?: string;
 }) {
   const [drawer, setDrawer] = useState<"pinned" | "media" | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [serverPinnedMessages, setServerPinnedMessages] = useState<Message[]>([]);
 
-  // Extract pinned messages (messages containing #pin or marked)
-  const pinnedMessages = messages.filter((m) => m.content.includes("#pin") || m.content.includes("📌"));
+  // Fetch pinned messages from API if channelId exists
+  const fetchPinnedMessages = useCallback(async () => {
+    if (!channelId) return;
+    try {
+      const res = await fetch(`/api/channels/${channelId}/pins`);
+      if (res.ok) {
+        const data = await res.json();
+        setServerPinnedMessages(data);
+      }
+    } catch {
+      // fallback
+    }
+  }, [channelId]);
+
+  useEffect(() => {
+    if (drawer === "pinned") {
+      fetchPinnedMessages();
+    }
+  }, [drawer, fetchPinnedMessages]);
+
+  // Combine local tagged messages (#pin/📌 or isPinned) and server pinned messages
+  const localPinned = messages.filter(
+    (m) => m.isPinned || m.content.includes("#pin") || m.content.includes("📌")
+  );
+  
+  const pinnedMessagesMap = new Map<string, Message>();
+  serverPinnedMessages.forEach((m) => pinnedMessagesMap.set(m.id, m));
+  localPinned.forEach((m) => pinnedMessagesMap.set(m.id, m));
+  const pinnedMessages = Array.from(pinnedMessagesMap.values());
 
   // Extract images from messages (![alt](url))
   const mediaItems: { url: string; sender: string; date: string }[] = [];
@@ -85,7 +116,7 @@ export function ChannelHeaderExtras({
           <div className="flex items-center justify-between border-b border-line pb-2.5 mb-3">
             <span className="text-xs font-bold text-text flex items-center gap-1.5">
               {drawer === "pinned" ? <Pin className="h-3.5 w-3.5 text-idle" /> : <ImageIcon className="h-3.5 w-3.5 text-purple-400" />}
-              {drawer === "pinned" ? "고정된 메시지 (#pin)" : "미디어 & 파일 갤러리"}
+              {drawer === "pinned" ? "고정된 메시지 (Pin)" : "미디어 & 파일 갤러리"}
             </span>
             <button onClick={() => setDrawer(null)} className="text-muted hover:text-text text-xs">
               <X className="h-4 w-4" />
@@ -101,12 +132,12 @@ export function ChannelHeaderExtras({
                 </div>
               ) : (
                 pinnedMessages.map((pm) => (
-                  <div key={pm.id} className="rounded-xl border border-line bg-surface p-3 text-xs">
+                  <div key={pm.id} className="rounded-xl border border-line bg-surface p-3 text-xs shadow-sm hover:border-idle/40 transition">
                     <div className="flex items-center justify-between text-muted text-[10px] mb-1">
-                      <span className="font-semibold text-idle">@{pm.profile?.username}</span>
+                      <span className="font-semibold text-idle">@{pm.profile?.displayName || pm.profile?.username || "유저"}</span>
                       <span>{new Date(pm.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                     </div>
-                    <p className="text-text text-xs whitespace-pre-wrap">{pm.content}</p>
+                    <p className="text-text text-xs whitespace-pre-wrap leading-relaxed">{pm.content}</p>
                   </div>
                 ))
               )}
