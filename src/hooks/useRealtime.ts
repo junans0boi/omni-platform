@@ -1,9 +1,11 @@
+"use client";
+
 import { useEffect } from "react";
-import type { PresenceSnapshot } from "@/lib/events";
 import { getSoundEffects } from "@/lib/browser-sound-effects";
-import { resolveMessageSound } from "@/lib/sound-effects";
-import { useAppStore, type RealtimeMessage } from "@/store/useAppStore";
+import { useAppStore } from "@/store/useAppStore";
 import { useSoundEffectsUnlock } from "@/hooks/useSoundEffectsUnlock";
+import type { PresenceSnapshot } from "@/lib/events";
+import type { RealtimeMessage } from "@/store/useAppStore";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -13,43 +15,51 @@ function parseMessageEvent(
   data: string,
   channelId: string
 ): RealtimeMessage | null {
-  const value: unknown = JSON.parse(data);
-  if (!isRecord(value) || typeof value.id !== "string") return null;
+  try {
+    const value: unknown = JSON.parse(data);
+    if (!isRecord(value) || typeof value.id !== "string") return null;
 
-  if (value._type === "DELETE") {
-    return { id: value.id, channelId, _type: "DELETE" };
-  }
+    if (value._type === "DELETE") {
+      return { id: value.id, channelId, _type: "DELETE" };
+    }
 
-  if (
-    typeof value.channelId !== "string" ||
-    typeof value.profileId !== "string" ||
-    typeof value.content !== "string" ||
-    typeof value.createdAt !== "string"
-  ) {
-    return null;
-  }
-
-  return { ...value, channelId } as RealtimeMessage;
-}
-
-function parsePresenceSnapshot(data: string): PresenceSnapshot | null {
-  const value: unknown = JSON.parse(data);
-  if (!isRecord(value)) return null;
-
-  for (const presence of Object.values(value)) {
     if (
-      !isRecord(presence) ||
-      typeof presence.user_id !== "string" ||
-      typeof presence.username !== "string" ||
-      typeof presence.display_name !== "string" ||
-      typeof presence.online_at !== "string" ||
-      !(typeof presence.avatar_url === "string" || presence.avatar_url === null)
+      typeof value.channelId !== "string" ||
+      typeof value.profileId !== "string" ||
+      typeof value.content !== "string" ||
+      typeof value.createdAt !== "string"
     ) {
       return null;
     }
-  }
 
-  return value as PresenceSnapshot;
+    return { ...value, channelId } as RealtimeMessage;
+  } catch {
+    return null;
+  }
+}
+
+function parsePresenceSnapshot(data: string): PresenceSnapshot | null {
+  try {
+    const value: unknown = JSON.parse(data);
+    if (!isRecord(value)) return null;
+
+    for (const presence of Object.values(value)) {
+      if (
+        !isRecord(presence) ||
+        typeof presence.user_id !== "string" ||
+        typeof presence.username !== "string" ||
+        typeof presence.display_name !== "string" ||
+        typeof presence.online_at !== "string" ||
+        !(typeof presence.avatar_url === "string" || presence.avatar_url === null)
+      ) {
+        return null;
+      }
+    }
+
+    return value as PresenceSnapshot;
+  } catch {
+    return null;
+  }
 }
 
 export const useRealtime = () => {
@@ -68,7 +78,7 @@ export const useRealtime = () => {
     getSoundEffects()?.setDnd(profile?.availability === "DND");
   }, [profile?.availability]);
 
-  // Subscribe to every text channel so inactive-channel messages become unread.
+  // Subscribe to text channels message streams + fallback polling
   useEffect(() => {
     const textChannelIds = channels
       .filter(
@@ -87,15 +97,9 @@ export const useRealtime = () => {
           const message = parseMessageEvent(event.data, channelId);
           if (message) {
             if (!("_type" in message)) {
-              const sound = resolveMessageSound({
-                authoredBySelf: message.profileId === profileId,
-                activeChannel: message.channelId === activeChannelId,
-                targetedMention: Boolean(
-                  profileId && message.mentions?.some((mention) =>
-                    mention.recipients.some((recipient) => recipient.profileId === profileId),
-                  ),
-                ),
-              });
+              const isMe = message.profileId === profileId;
+              const isActive = message.channelId === activeChannelId;
+              const sound = !isMe ? (isActive ? "INACTIVE_MESSAGE" : "INACTIVE_MESSAGE") : null;
               if (sound) getSoundEffects()?.emit(sound);
             }
             addMessage(message);
@@ -108,12 +112,20 @@ export const useRealtime = () => {
       return eventSource;
     });
 
+    // Issue #21: Background polling fallback (5 sec interval)
+    const pollingInterval = setInterval(() => {
+      if (activeChannelId) {
+        useAppStore.getState().fetchMessages(activeChannelId);
+      }
+    }, 5000);
+
     return () => {
       eventSources.forEach((eventSource) => eventSource.close());
+      clearInterval(pollingInterval);
     };
   }, [activeChannelId, activeSpaceId, addMessage, channels, profileId]);
 
-  // The authenticated SSE connection itself represents local presence.
+  // Active space presence stream
   useEffect(() => {
     if (!activeSpaceId || !profile) return;
 
@@ -136,17 +148,19 @@ export const useRealtime = () => {
     };
   }, [activeSpaceId, profile, setPresenceUsers]);
 
-  // Per-user stream: DM new-message pushes and friend-request events.
+  // Issue #15, #18, #19, #20: Single Global SSE stream + /api/events/stream
   useEffect(() => {
     if (!profile) return;
 
-    const eventSource = new EventSource("/api/users/me/stream");
+    const streamUrl = "/api/events/stream";
+    const eventSource = new EventSource(streamUrl);
 
     eventSource.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data) as {
           type?: string;
           conversationId?: string;
+          friendship?: unknown;
         };
         if (payload.type === "dm:new" && typeof payload.conversationId === "string") {
           const activeDmId = useAppStore.getState().activeDmConversationId;
@@ -171,7 +185,7 @@ export const useRealtime = () => {
           }
         }
       } catch (error) {
-        console.error("Failed to parse user SSE payload:", error);
+        console.error("Failed to parse global SSE payload:", error);
       }
     };
 
