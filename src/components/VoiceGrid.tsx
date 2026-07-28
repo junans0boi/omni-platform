@@ -21,14 +21,14 @@ import {
 import {
   Mic, MicOff, Video, VideoOff, Monitor, PhoneOff,
   ChevronUp, ChevronDown, Volume2, Maximize2, Minimize2,
-  Hand, Users,
+  Hand, Users, Captions,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Issue #102: LiveKit DataChannel 기반 발언권 제어 메시지 타입
+// Issue #102 & TICK-201: DataChannel 발언권 및 실시간 자막 메시지 프로토콜
 // ─────────────────────────────────────────────────────────────────────────────
-type FloorMsgType = "FLOOR_REQUEST" | "FLOOR_CANCEL" | "FLOOR_GRANT" | "FLOOR_REVOKE";
+type FloorMsgType = "FLOOR_REQUEST" | "FLOOR_CANCEL" | "FLOOR_GRANT" | "FLOOR_REVOKE" | "CAPTION_CHUNK";
 
 interface FloorMessage {
   type: FloorMsgType;
@@ -36,6 +36,8 @@ interface FloorMessage {
   identity: string;
   /** 표시 이름 (REQUEST 시 함께 전달) */
   name?: string;
+  /** 자막 텍스트 (CAPTION_CHUNK 시) */
+  captionText?: string;
 }
 
 const enc = new TextEncoder();
@@ -105,6 +107,10 @@ export default function VoiceGrid() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // TICK-201, TICK-202: 실시간 AI 자막 State
+  const [showCaptions, setShowCaptions] = useState(true);
+  const [currentCaption, setCurrentCaption] = useState<{ speaker: string; text: string } | null>(null);
+
   // Issue #102: 발언권 — DataChannel 연동
   const [floorRequests, setFloorRequests] = useState<{ identity: string; name: string }[]>([]);
   const [grantedSpeakers, setGrantedSpeakers] = useState<string[]>([]);
@@ -136,7 +142,6 @@ export default function VoiceGrid() {
   const canPublish = getCanPublish(livekitToken);
   const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "";
   const renderVideo = shouldRenderVideo(isCollapsed, documentVisibility);
-
   // ── 토스트 자동 소멸 ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!floorToast) return;
@@ -175,9 +180,48 @@ export default function VoiceGrid() {
     if (!room || room.state !== ConnectionState.Connected) return;
     room.localParticipant.publishData(encodeFloor(msg), {
       reliable: true,
-      // 전체 브로드캐스트 (특정 참여자만 지정하지 않음)
     });
   }, []);
+
+  // Web Speech API 기반 음성 인식 & 자막 전송 훅
+  useEffect(() => {
+    if (isMuted || !connectionState || connectionState !== ConnectionState.Connected) return;
+    if (typeof window === "undefined") return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "ko-KR";
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      recognition.onresult = (event: any) => {
+        const lastIndex = event.results.length - 1;
+        const transcriptText = event.results[lastIndex][0].transcript;
+        if (transcriptText.trim()) {
+          const speakerName = profile?.displayName || profile?.username || "나";
+          setCurrentCaption({ speaker: speakerName, text: transcriptText });
+          publishFloor({
+            type: "CAPTION_CHUNK",
+            identity: profile?.id || "local",
+            name: speakerName,
+            captionText: transcriptText,
+          });
+        }
+      };
+
+      recognition.start();
+      return () => {
+        try { recognition.stop(); } catch {}
+      };
+    } catch {}
+  }, [isMuted, connectionState, profile, publishFloor]);
+
+  // ── DataChannel 수신 처리 ─────────────────────────────────────────────
 
   // ── Connect / Disconnect ──────────────────────────────────────────────────
   useEffect(() => {
@@ -280,6 +324,16 @@ export default function VoiceGrid() {
               );
               setHandRaised(false);
               setFloorToast({ text: "발언 권한이 회수되었습니다.", ok: false });
+            }
+            break;
+
+          // ─── TICK-201: 실시간 AI 자막 패킷 수신 ──────────────────────
+          case "CAPTION_CHUNK":
+            if (msg.captionText) {
+              setCurrentCaption({
+                speaker: msg.name || msg.identity,
+                text: msg.captionText,
+              });
             }
             break;
         }
@@ -667,6 +721,16 @@ export default function VoiceGrid() {
             })}
           </div>
 
+          {/* TICK-202: Live Captions Overlay Banner */}
+          {showCaptions && currentCaption && (
+            <div className="mx-3 mb-2 flex items-center justify-center">
+              <div className="flex items-center gap-2 rounded-xl border border-accent/30 bg-surface/90 px-4 py-1.5 shadow-lg backdrop-blur-md text-xs">
+                <span className="font-bold text-accent shrink-0">💬 @{currentCaption.speaker}:</span>
+                <span className="text-text font-medium animate-in fade-in duration-150">{currentCaption.text}</span>
+              </div>
+            </div>
+          )}
+
           {/* Controls */}
           <div className="flex items-center justify-center gap-3 py-2.5 border-t border-line flex-wrap px-3">
             {/* Mic */}
@@ -710,6 +774,18 @@ export default function VoiceGrid() {
               disabled={!canPublish || !isConnected}
             >
               <Monitor className="h-4 w-4" />
+            </ControlButton>
+
+            {/* TICK-202: Live Captions Toggle Button */}
+            <ControlButton
+              active={showCaptions}
+              activeClass="bg-accent/15 text-accent border-accent/30"
+              inactiveClass="bg-surface text-muted border-line hover:bg-surface-2"
+              onClick={() => setShowCaptions(!showCaptions)}
+              title={showCaptions ? "실시간 자막 끄기" : "실시간 자막 켜기"}
+              ariaPressed={showCaptions}
+            >
+              <Captions className="h-4 w-4" />
             </ControlButton>
 
             {/* Mode Badge */}

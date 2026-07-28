@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Pin, Image as ImageIcon, Bell, BellOff, X } from "lucide-react";
+import { Pin, Image as ImageIcon, Bell, BellOff, X, FileText, Download } from "lucide-react";
 
 interface Message {
   id: string;
@@ -22,9 +22,41 @@ export function ChannelHeaderExtras({
   messages: Message[];
   channelId?: string;
 }) {
-  const [drawer, setDrawer] = useState<"pinned" | "media" | null>(null);
+  const [drawer, setDrawer] = useState<"pinned" | "media" | "summary" | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [serverPinnedMessages, setServerPinnedMessages] = useState<Message[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [summaries, setSummaries] = useState<any[]>([]);
+
+  // Fetch summary history from API
+  const fetchSummaries = useCallback(async () => {
+    if (!channelId) return;
+    try {
+      const res = await fetch(`/api/channels/${channelId}/summary`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.summaries) setSummaries(data.summaries);
+      }
+    } catch {}
+  }, [channelId]);
+
+  useEffect(() => {
+    if (drawer === "summary") {
+      fetchSummaries();
+    }
+  }, [drawer, fetchSummaries]);
+
+  // Markdown file download helper (TICK-206)
+  const handleDownloadMarkdown = (summaryItem: { title: string; summaryText: string }) => {
+    const content = `# ${summaryItem.title}\n\n${summaryItem.summaryText}\n\n---\nExported from Omni Platform`;
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `meeting_summary_${Date.now()}.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Fetch pinned messages from API if channelId exists
   const fetchPinnedMessages = useCallback(async () => {
@@ -97,6 +129,19 @@ export function ChannelHeaderExtras({
         <ImageIcon className="h-4 w-4" />
       </button>
 
+      {/* TICK-205: Summary Drawer Button */}
+      <button
+        onClick={() => setDrawer(drawer === "summary" ? null : "summary")}
+        title="AI 회의록 요약 & 히스토리"
+        className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+          drawer === "summary"
+            ? "bg-accent/20 text-accent border border-accent/30"
+            : "text-muted hover:bg-surface-2 hover:text-text"
+        }`}
+      >
+        <FileText className="h-4 w-4" />
+      </button>
+
       {/* Channel Notification Mute Toggle */}
       <button
         onClick={() => setIsMuted(!isMuted)}
@@ -115,8 +160,10 @@ export function ChannelHeaderExtras({
         <div className="absolute top-10 right-0 w-80 rounded-2xl border border-line bg-surface p-4 shadow-2xl backdrop-blur-2xl z-50 text-left animate-fadeIn">
           <div className="flex items-center justify-between border-b border-line pb-2.5 mb-3">
             <span className="text-xs font-bold text-text flex items-center gap-1.5">
-              {drawer === "pinned" ? <Pin className="h-3.5 w-3.5 text-idle" /> : <ImageIcon className="h-3.5 w-3.5 text-purple-400" />}
-              {drawer === "pinned" ? "고정된 메시지 (Pin)" : "미디어 & 파일 갤러리"}
+              {drawer === "pinned" && <Pin className="h-3.5 w-3.5 text-idle" />}
+              {drawer === "media" && <ImageIcon className="h-3.5 w-3.5 text-purple-400" />}
+              {drawer === "summary" && <FileText className="h-3.5 w-3.5 text-accent" />}
+              {drawer === "pinned" ? "고정된 메시지 (Pin)" : drawer === "media" ? "미디어 & 파일 갤러리" : "AI 회의록 요약"}
             </span>
             <button onClick={() => setDrawer(null)} className="text-muted hover:text-text text-xs">
               <X className="h-4 w-4" />
@@ -162,6 +209,35 @@ export function ChannelHeaderExtras({
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          )}
+          {drawer === "summary" && (
+            <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+              {summaries.length === 0 ? (
+                <div className="py-6 text-center text-xs text-muted">
+                  생성된 요약 회의록이 없습니다.
+                </div>
+              ) : (
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                summaries.map((sum: any) => (
+                  <div key={sum.id} className="rounded-xl border border-line bg-surface p-3 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-text truncate max-w-[170px]">{sum.title}</span>
+                      <button
+                        onClick={() => handleDownloadMarkdown(sum)}
+                        title="Markdown (.md) 내보내기"
+                        className="flex items-center gap-1 px-2 py-0.5 rounded bg-accent/20 text-accent hover:bg-accent/30 text-[10px] font-bold transition"
+                      >
+                        <Download className="h-3 w-3" />
+                        <span>.md</span>
+                      </button>
+                    </div>
+                    <p className="text-muted text-[11px] whitespace-pre-wrap leading-relaxed border-t border-line/50 pt-2">
+                      {sum.summaryText}
+                    </p>
+                  </div>
+                ))
               )}
             </div>
           )}

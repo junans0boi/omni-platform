@@ -1,7 +1,7 @@
 # Omni Platform System Specification (SPECIFICATION)
 
 ## 📌 1. 개요 (Overview)
-Omni Platform은 디스코드(Discord) 스타일의 차세대 실시간 커뮤니케이션 플랫폼으로, 실시간 음성/화상 통화(LiveKit integration), 메시징, 1:1 DM 및 친구 관리, 다국어(i18n), 커스텀 RBAC 권한, Caddy 기반 HTTPS 자동화 배포를 지원합니다.
+Omni Platform은 디스코드(Discord) 스타일의 차세대 실시간 커뮤니케이션 플랫폼으로, 실시간 음성/화상 통화(LiveKit integration), 메시징, 1:1 DM 및 친구 관리, 다국어(i18n), 커스텀 RBAC 권한, Caddy 기반 HTTPS 자동화 배포, 그리고 **4대 신규 확장 기능 (실시간 AI 자막, 웹캠 가상 배경/화질 설정, 회의록 PDF/MD 내보내기, 실시간 공유 문서/캔버스 채널)**을 지원합니다.
 
 ---
 
@@ -10,8 +10,8 @@ Omni Platform은 디스코드(Discord) 스타일의 차세대 실시간 커뮤�
 - **State Management**: Zustand (전역 영속성 및 미읽음 배지 관리)
 - **Styling**: Vanilla CSS / Tailwind CSS (다크 모드 및 커스텀 테마 트랜스미션/나이트 시그널 지원)
 - **Database & ORM**: SQLite (Prisma ORM)
-- **Realtime Media / Voice**: LiveKit Client SDK (`livekit-client` v2.x)
-- **Realtime Pipeline**: Server-Sent Events (SSE) + EventEmitter (`/api/events/stream`)
+- **Realtime Media / Voice**: LiveKit Client SDK (`livekit-client` v2.x) & Web Speech API
+- **Realtime Pipeline**: Server-Sent Events (SSE) + EventEmitter (`/api/events/stream`) & LiveKit DataChannel
 - **Reverse Proxy & TLS**: Caddy Server (Let's Encrypt 자동 HTTPS & WebSocket Proxy)
 
 ---
@@ -25,46 +25,32 @@ graph TD
     NextApp -->|Prisma ORM| SQLite[(SQLite Database)]
     NextApp -->|SSE Pipeline| Events[/api/events/stream]
     Client -->|WebRTC / DataChannel| LiveKit[LiveKit Media Server]
+    
+    subgraph Advanced Features
+        Client -->|Web Speech API| LiveCaptions[Live Captions Overlay]
+        Client -->|Canvas Processing| VirtualBg[Virtual Background Filter]
+        NextApp -->|PDF / MD Generation| SummaryExport[Summary Export Engine]
+        NextApp -->|Docs & Canvas API| ChannelExtensions[DOCS & CANVAS Channels]
+    end
 ```
 
 ---
 
 ## 📑 4. 상세 기능 명세 (Detailed Specifications)
 
-### 4.1 음성/화상 채널 및 발언권 제어 (Voice & Stage Channels)
-- **채널 모드 (Channel Modes)**:
-  - `GENERAL` (자유 소통): 제한 없는 다자간 대화.
-  - `MEETING` (회의 모드) & `LECTURE` (강의 모드): 호스트 관리 하의 발언권 제어.
-- **LiveKit DataChannel 기반 발언권 제어 (Floor Control)**:
-  - `FLOOR_REQUEST`: 비-호스트 발언 신청 브로드캐스트.
-  - `FLOOR_CANCEL`: 발언 신청 취소.
-  - `FLOOR_GRANT`: 호스트가 해당 참여자 마이크 실시간 개방 (`setMicrophoneEnabled(true)`).
-  - `FLOOR_REVOKE`: 호스트가 발언 권한 회수 (`setMicrophoneEnabled(false)`).
-- **마이크 입력 프로필 (Audio Input Profiles)**:
-  - `isolation`: 노이즈 억제 ON, 에코 취소 ON, 자동 게인 ON.
-  - `studio`: 노이즈 억제 OFF, 에코 취소 OFF, 자동 게인 OFF (RAW 오디오).
-  - `custom`: 개별 오디오 노드 선택.
+### 4.1 실시간 AI 자막 기능 (Live Captions)
+- **음성 인식 캡처**: 브라우저 native Web Speech API (`webkitSpeechRecognition`) 활용.
+- **실시간 패킷 브로드캐스트**: 인식된 자막 텍스트를 LiveKit DataChannel(`CAPTION_CHUNK`)을 통해 해당 채널 모든 참여자에게 전송.
+- **자막 렌더링**: VoiceGrid 하단 오버레이 바에 화자 이름(`@username`) 및 텍스트 시각화.
 
-### 4.2 사용자 인증 및 Google OAuth 2.0
-- **동적 Public Origin 감지 (`getPublicOrigin`)**:
-  - 리버스 프록시(Caddy/Nginx) 헤더 (`x-forwarded-host`, `x-forwarded-proto`, `host`)를 자동 해석하여 외부 도메인(`https://omni.steady2vivid.kro.kr`) 및 로컬 개발 환경 모두 지원.
-- **자체 세션 관리**:
-  - SHA-256 토큰 해싱 기반 HTTP-only 세션 쿠키 발급.
+### 4.2 웹캠 가상 배경 & 화면 공유 프레셋 (Virtual Background & Quality Presets)
+- **비디오 배경 가공**: Canvas 2D `filter = "blur(8px)"` 처리를 통한 가상 배경 블러(Blur) 적용.
+- **화면 공유 프리셋**: 720p(30fps), 1080p(60fps) 등 화면 공유 인코딩 비트레이트 및 resolution 옵션 선제 지정.
 
-### 4.3 모바일/태블릿 반응형 UX (Mobile Responsiveness)
-- 768px 이하 모바일 환경 사이드바 자동 닫기.
-- Backdrop Overlay 터치 닫기, 사이드바 상단 `X` 버튼, 채널 클릭 시 자동 슬라이드 수축 및 `ESC` 키 바인딩.
+### 4.3 회의록 PDF / Markdown 내보내기 & 요약 히스토리 UI
+- **히스토리 조회 & 생성**: `/api/channels/[id]/summary` API 통신.
+- **문서 내보내기**: 마크다운(`.md`) 파일 다운로드 (Blob 인코딩) 및 HTML to PDF 파싱 기능 제공.
 
-### 4.4 다국어 지원 (i18n)
-- 한국어(`ko`), 영어(`en`) 카탈로그 지원 (`catalogs.ts`).
-- `I18nProvider` 및 `useI18n()` 훅을 통한 컴포넌트 텍스트 동적 동기화.
-
----
-
-## 🗄️ 5. 주요 데이터베이스 모델 (Data Schema)
-
-- **`Profile`**: 사용자 계정, 이메일, 아바타, 상태(AVAILABLE/IDLE/DND).
-- **`Space`**: 커뮤니티 공간, 소유자(ownerId), 초대 코드(inviteCode).
-- **`Channel`**: 텍스트/음성/스테이지 채널, 모드(GENERAL/MEETING/LECTURE).
-- **`Message`**: 채널 메시지, 답글(replyToId), 스레드(threadRootId), 핀(isPinned).
-- **`Friendship`**: 친구 관계(PENDING/ACCEPTED/BLOCKED), 요청자, 1:1 대화 연결.
+### 4.4 실시간 공유 문서/캔버스 채널 (DOCS & CANVAS Channels)
+- **채널 타입 확장**: `DOCS` (마크다운 공동 에디터), `CANVAS` (화이트보드 그림판).
+- **데이터 영속성**: `ChannelDoc` 및 `ChannelCanvas` 테이블을 통한 문서 내역 저장 및 실시간 동기화.

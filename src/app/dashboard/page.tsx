@@ -17,6 +17,8 @@ import { SettingsModal } from "@/components/SettingsModal";
 import { SpaceSettingsModal } from "@/components/SpaceSettingsModal";
 import { FriendsPanel } from "@/components/FriendsPanel";
 import { ChannelHeaderExtras } from "@/components/ChannelHeaderExtras";
+import { DocsView } from "@/components/DocsView";
+import { CanvasView } from "@/components/CanvasView";
 import { NotificationDrawer } from "@/components/NotificationDrawer";
 import { getSoundEffects } from "@/lib/browser-sound-effects";
 import { DEFAULT_SOUND_PREFERENCE } from "@/lib/sound-effects";
@@ -1355,11 +1357,15 @@ export default function DashboardPage() {
             addMsg={friendsAndDms.addMsg}
             sendingRequest={friendsAndDms.sendingRequest}
             handleSendFriendRequest={friendsAndDms.handleSendFriendRequest}
-            pendingFile={friendsAndDms.pendingFile}
+pendingFile={friendsAndDms.pendingFile}
             filePreview={friendsAndDms.filePreview}
             handleSelectFile={friendsAndDms.handleSelectFile}
             clearPendingFile={friendsAndDms.clearPendingFile}
           />
+        ) : activeChannel && (activeChannel.type as string) === "DOCS" ? (
+          <DocsView channelId={activeChannel.id} channelName={activeChannel.name} />
+        ) : activeChannel && (activeChannel.type as string) === "CANVAS" ? (
+          <CanvasView channelId={activeChannel.id} channelName={activeChannel.name} />
         ) : activeChannel ? (
           <>
             {/* Top Bar */}
