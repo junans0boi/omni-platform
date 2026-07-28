@@ -49,8 +49,9 @@ export function SettingsModal({
   currentThemeMode,
   onThemeChange,
 }: SettingsModalProps) {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const [activeTab, setActiveTab] = useState<NavTabKey>("account");
+  const [profileAppliedMsg, setProfileAppliedMsg] = useState<string | null>(null);
 
   // Account State
   const [username, setUsername] = useState(profile?.username || "");
@@ -209,6 +210,7 @@ export function SettingsModal({
   }, [isOpen, fetchUserPreferences, selectedMic, selectedSpeaker, selectedCamera]);
 
   // Real Microphone Audio Analyser Engine with Loopback Support
+  // Issue #104: inputProfile에 따라 getUserMedia constraints 실제 적용
   useEffect(() => {
     let stream: MediaStream | null = null;
     let audioCtx: AudioContext | null = null;
@@ -216,7 +218,42 @@ export function SettingsModal({
     let fallbackTimer: NodeJS.Timeout;
 
     if (isTestingMic && typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
-      const constraints = selectedMic ? { audio: { deviceId: { exact: selectedMic } } } : { audio: true };
+      // inputProfile에 따른 오디오 처리 constraints 결정
+      const getAudioProcessingConstraints = () => {
+        switch (inputProfile) {
+          case "isolation":
+            return {
+              noiseSuppression: true,
+              echoCancellation: true,
+              autoGainControl: true,
+            };
+          case "studio":
+            return {
+              noiseSuppression: false,
+              echoCancellation: false,
+              autoGainControl: false,
+            };
+          case "custom":
+          default:
+            // custom: 현재 개별 설정 반영 (기본값 true)
+            return {
+              noiseSuppression: true,
+              echoCancellation: true,
+              autoGainControl: true,
+            };
+        }
+      };
+
+      const audioProcessing = getAudioProcessingConstraints();
+      const constraints: MediaStreamConstraints = selectedMic
+        ? {
+            audio: {
+              deviceId: { exact: selectedMic },
+              ...audioProcessing,
+            },
+          }
+        : { audio: { ...audioProcessing } };
+
       navigator.mediaDevices
         .getUserMedia(constraints)
         .then((s) => {
@@ -258,7 +295,7 @@ export function SettingsModal({
       if (audioCtx) audioCtx.close();
       setMicMeterLevel(0);
     };
-  }, [isTestingMic, selectedMic, micLoopback, micVolume]);
+  }, [isTestingMic, selectedMic, micLoopback, micVolume, inputProfile]);
 
   // Camera preview stream handler
   useEffect(() => {
@@ -988,12 +1025,22 @@ export function SettingsModal({
                   </a>
                 </div>
 
-                {/* 입력 프로필 */}
+                {/* 입력 프로필 — Issue #103 i18n + Issue #104 실제 constraints 피드백 */}
                 <div className="pt-3 border-t border-line space-y-3">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-muted block">입력 프로필</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-muted block">{t("settings.voice.inputProfile")}</span>
+                    {profileAppliedMsg && (
+                      <span className="text-[10px] text-online font-semibold animate-pulse">{profileAppliedMsg}</span>
+                    )}
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <button
-                      onClick={() => setInputProfile("isolation")}
+                      onClick={() => {
+                        setInputProfile("isolation");
+                        updatePreference({ inputProfile: "isolation" });
+                        setProfileAppliedMsg(t("settings.voice.profileApplied"));
+                        setTimeout(() => setProfileAppliedMsg(null), 2000);
+                      }}
                       className={`p-3.5 rounded-xl border text-left transition ${
                         inputProfile === "isolation"
                           ? "border-accent bg-accent-soft text-text"
@@ -1002,15 +1049,20 @@ export function SettingsModal({
                     >
                       <div className="flex items-center gap-1.5 font-bold text-xs mb-1">
                         <Sparkles className="h-3.5 w-3.5 text-accent" />
-                        <span>음성 격리</span>
+                        <span>{t("settings.voice.isolation")}</span>
                       </div>
                       <p className="text-[10px] text-muted leading-tight">
-                        멋진 목소리만 들려 드릴게요. 소음은 알아서 처리할게요
+                        {t("settings.voice.noiseHint.isolation")}
                       </p>
                     </button>
 
                     <button
-                      onClick={() => setInputProfile("studio")}
+                      onClick={() => {
+                        setInputProfile("studio");
+                        updatePreference({ inputProfile: "studio" });
+                        setProfileAppliedMsg(t("settings.voice.profileApplied"));
+                        setTimeout(() => setProfileAppliedMsg(null), 2000);
+                      }}
                       className={`p-3.5 rounded-xl border text-left transition ${
                         inputProfile === "studio"
                           ? "border-accent bg-accent-soft text-text"
@@ -1019,15 +1071,20 @@ export function SettingsModal({
                     >
                       <div className="flex items-center gap-1.5 font-bold text-xs mb-1">
                         <Volume2 className="h-3.5 w-3.5 text-accent-strong" />
-                        <span>스튜디오</span>
+                        <span>{t("settings.voice.studio")}</span>
                       </div>
                       <p className="text-[10px] text-muted leading-tight">
-                        순수 오디오: 프로세싱 없이 마이크 열기
+                        {t("settings.voice.noiseHint.studio")}
                       </p>
                     </button>
 
                     <button
-                      onClick={() => setInputProfile("custom")}
+                      onClick={() => {
+                        setInputProfile("custom");
+                        updatePreference({ inputProfile: "custom" });
+                        setProfileAppliedMsg(t("settings.voice.profileApplied"));
+                        setTimeout(() => setProfileAppliedMsg(null), 2000);
+                      }}
                       className={`p-3.5 rounded-xl border text-left transition ${
                         inputProfile === "custom"
                           ? "border-accent bg-accent-soft text-text"
@@ -1036,10 +1093,10 @@ export function SettingsModal({
                     >
                       <div className="flex items-center gap-1.5 font-bold text-xs mb-1">
                         <Sliders className="h-3.5 w-3.5 text-online" />
-                        <span>사용자 지정</span>
+                        <span>{t("settings.voice.custom")}</span>
                       </div>
                       <p className="text-[10px] text-muted leading-tight">
-                        고급 모드: 모든 버튼과 다이얼을 주세요!
+                        {t("settings.voice.noiseHint.custom")}
                       </p>
                     </button>
                   </div>

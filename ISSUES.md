@@ -104,11 +104,11 @@ graph TD
 
 #### **Issue #17: [UI-MOBILE-1] 모바일 검은 화면 수정 및 상단 햄버거 반응형 드로어 구현**
 - **상태**: 🟡 진행 예정 (Open)
-- **설명**: 모바일/PC 사이드바 닫힘 시 검은 화면만 출력되는 문제 해결 및 상단 햄버거(☰) 헤더 기반 반응형 슬라이드 드로어 구축.
+- **설명**: 모바일/PC 사이드바 닫힌 시 검은 화면만 출력되는 문제 해결 및 상단 햄버거(☰) 헤더 기반 반응형 슬라이드 드로어 구축.
 
 #### **Issue #18: [FRIENDS-1] 실시간 친구 요청 보냄/수락 동기화 및 대기 목록 갱신**
 - **상태**: 🟡 진행 예정 (Open)
-- **설명**: 친구 요청 수신 시 대기 목록/배지 즉시 +1 갱신 및 수락 시 페이지 새로고침 없이 온라인/친구 목록 이동 및 1:1 DM 활성화.
+- **설명**: 친구 요청 수신 시 대기 목록/배지 즉시 +1 갱신 및 수락 시 페이지 새로고침 없이 양쪽 유저 화면의 '친구 목록/온라인' 탭으로 즉시 이동 및 1:1 DM 버튼이 활성화.
 
 #### **Issue #19: [DM-1] 실시간 1:1 DM 메시지 수발신 및 실시간 알림 연동**
 - **상태**: 🟡 진행 예정 (Open)
@@ -116,7 +116,7 @@ graph TD
 
 #### **Issue #20: [BADGE-1] 스페이스/친구/개별 DM 세분화 배지 수신 및 자동 읽음 처리**
 - **상태**: 🟡 진행 예정 (Open)
-- **설명**: 최좌측 친구/DM 아이콘, 각 스페이스 아이콘, 개별 DM 항목에 미읽음 배지 수 표시 및 해당 채널/DM 입장 시 배지 차감/소멸 처리.
+- **설명**: 최좌측 친구/DM 아이콘, 각 스페이스 아이콘, 개별 DM 목록 항목에 미읽음 배지 수 표시 및 해당 채널/DM 입장 시 배지 차감/소멸 처리.
 
 #### **Issue #21: [REALTIME-2] 실시간 채팅 수발신 동기화 및 백그라운드 폴링 백업 보강**
 - **상태**: 🟡 진행 예정 (Open)
@@ -130,4 +130,34 @@ graph TD
 - **상태**: ✅ 완료 (Resolved)
 - **설명**: Supabase Auth 의존 없이 자체 백엔드(Prisma + Next.js Session) 환경에서 구글 계정으로 로그인 및 신규 계정 자동 생성을 지원하는 Google OAuth 2.0 연동 기능 구현.
 
+---
 
+### 🔴 Phase 4 Sprint A: UX 버그 수정 & 실제 기능화 (2026-07-28)
+
+#### **Issue #100: [VOICE-UX-1] 음성채널 모드별 UI 분기 미구현**
+- **상태**: 🟡 진행 중 (In Progress)
+- **설명**: GENERAL(자유소통) 모드에서도 발언신청, 신청자 목록 버튼이 모든 모드에 표시되는 문제. 각 channelMode(GENERAL/MEETING/LECTURE)에 맞는 UI를 조건부 렌더링으로 분리.
+
+#### **Issue #101: [MOBILE-1] 모바일/태블릿 사이드바 닫기 불가**
+- **상태**: 🟡 진행 중 (In Progress)
+- **설명**: 768px 이하 모바일, 1024px 이하 태블릿에서 사이드바가 열렸을 때 닫을 방법이 없음. backdrop overlay 클릭, 사이드바 내 X 버튼, 채널 선택 시 자동 닫기 구현.
+
+#### **Issue #102: [STUB-1] 음성채널 발언권 관리 가짜 기능 (로컬 state만)**
+- **상태**: 🟠 Sprint B로 이관
+- **설명**: floorRequests/grantedSpeakers가 로컬 state만 관리되어 실제 다른 참여자의 마이크가 제어되지 않음. LiveKit DataChannel 연동 필요 — 다음 Sprint에서 구현.
+
+#### **Issue #103: [I18N-1] 다국어 키가 VoiceGrid/SettingsModal에 미적용**
+- **상태**: 🟡 진행 중 (In Progress)
+- **설명**: catalogs.ts에 한/영 번역 키가 정의되어 있으나, VoiceGrid.tsx 및 SettingsModal.tsx에서 t() 훅을 사용하지 않고 하드코딩. 음성채널 관련 신규 i18n 키 추가 및 적용.
+
+#### **Issue #104: [VOICE-SETTING-1] 마이크 입력 프로필(음성분리/스튜디오) getUserMedia 미반영**
+- **상태**: 🟡 진행 중 (In Progress)
+- **설명**: SettingsModal의 inputProfile(isolation/studio/custom) 선택값이 실제 getUserMedia constraints(noiseSuppression, echoCancellation, autoGainControl)에 반영되지 않아 사용자가 효과를 체감할 수 없음.
+
+#### **Issue #105: [DEPLOY-1] deploy.sh Nginx 기반 → Caddy+Let's Encrypt 통합**
+- **상태**: 🟡 진행 중 (In Progress)
+- **설명**: 메인 deploy.sh가 Nginx를 설치하도록 되어 있어 Caddy 기반 HTTPS 자동화와 불일치. Caddy를 기본 리버스 프록시로 통합하여 Let's Encrypt 자동 인증서 발급/갱신 지원.
+
+#### **Issue #106: [UI-1] 음성채널 전체화면 버튼 이모지 → Lucide 아이콘 교체**
+- **상태**: 🟡 진행 중 (In Progress)
+- **설명**: 전체화면 토글 버튼이 화살표 이모지(↗️/↙️)로 되어있어 의미가 불명확함. Lucide Maximize2/Minimize2 아이콘으로 교체.

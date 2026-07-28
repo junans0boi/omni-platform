@@ -275,6 +275,17 @@ export default function DashboardPage() {
     return () => window.removeEventListener("click", handleCloseMenu);
   }, []);
 
+  // Issue #101: Escape 키로 모바일 사이드바 닫기
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isChannelSidebarOpen && window.innerWidth < 768) {
+        setIsChannelSidebarOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isChannelSidebarOpen]);
+
   useEffect(() => {
     if (channels.length > 0) {
       const textChans = channels.filter((c) => c.type === "TEXT");
@@ -805,18 +816,40 @@ export default function DashboardPage() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-bg text-text">
+      {/* Mobile/Tablet backdrop overlay — Issue #101 */}
+      {isChannelSidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm md:hidden"
+          onClick={() => setIsChannelSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* 1. Unified Space and Channel sidebar */}
-      <div className="fixed md:relative left-0 inset-y-0 md:inset-y-auto z-40 md:z-20 flex flex-col overflow-hidden border-r border-line bg-surface transition-all duration-300 shrink-0"
-        style={{ width: isChannelSidebarOpen ? "240px" : "0px", opacity: isChannelSidebarOpen ? 1 : 0 }}>
+      <div
+        className="fixed md:relative left-0 inset-y-0 md:inset-y-auto z-40 md:z-20 flex flex-col overflow-hidden border-r border-line bg-surface transition-all duration-300 shrink-0"
+        style={{ width: isChannelSidebarOpen ? "240px" : "0px", opacity: isChannelSidebarOpen ? 1 : 0 }}
+      >
         {/* Top Header: Brand Name & Settings Icon */}
         <div className="flex h-12 shrink-0 items-center justify-between border-b border-line px-3">
           <div className="flex items-center gap-2">
             <a href="/home" aria-label="Home" title="Home" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent text-xs font-bold text-on-accent shadow-md shadow-[0_4px_12px_-2px_var(--accent)]">Ω</a>
             <span className="font-extrabold text-xs tracking-tight text-text">Omni Platform</span>
           </div>
-          <button onClick={() => setIsSettingsOpen(true)} title={t("settings.title")} className="rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-text transition">
-            <Settings className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setIsSettingsOpen(true)} title={t("settings.title")} className="rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-text transition">
+              <Settings className="h-4 w-4" />
+            </button>
+            {/* 모바일 전용 사이드바 닫기 버튼 — Issue #101 */}
+            <button
+              onClick={() => setIsChannelSidebarOpen(false)}
+              title="사이드바 닫기"
+              aria-label="사이드바 닫기"
+              className="md:hidden rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-text transition"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Global Switcher Tabs ([💬 스페이스] | [👥 친구/DM]) */}
@@ -1061,7 +1094,12 @@ export default function DashboardPage() {
                                 className="w-full rounded px-2 py-1 text-sm outline-hidden bg-surface-2 text-text border border-accent ml-5" />
                             ) : (
                               <>
-                                <button onClick={() => { setActiveChannelId(ch.id); if (ch.type !== "TEXT") joinVoiceChannel(ch.id); }}
+                                <button onClick={() => {
+                                  setActiveChannelId(ch.id);
+                                  if (ch.type !== "TEXT") joinVoiceChannel(ch.id);
+                                  // 모바일에서 채널 선택 시 자동으로 사이드바 닫기 — Issue #101
+                                  if (window.innerWidth < 768) setIsChannelSidebarOpen(false);
+                                }}
                                   onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "channel", id: ch.id, x: e.clientX, y: e.clientY, name: ch.name }); }}
                                   className={`flex flex-1 items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs transition ${isActive ? 'bg-accent-soft text-text border border-accent font-semibold' : 'text-muted hover:bg-surface-2 hover:text-text'}`}>
                                   {ch.type === "TEXT" ? <Hash className="h-3.5 w-3.5 shrink-0 opacity-70" /> : <Volume2 className="h-3.5 w-3.5 shrink-0 opacity-70 text-accent" />}

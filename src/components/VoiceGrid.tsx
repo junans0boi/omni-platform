@@ -18,9 +18,15 @@ import {
   readParticipantVolumes,
   writeParticipantVolumes,
 } from "@/lib/participant-volume";
-import { Mic, MicOff, Video, VideoOff, Monitor, PhoneOff, ChevronUp, ChevronDown, Volume2 } from "lucide-react";
+import {
+  Mic, MicOff, Video, VideoOff, Monitor, PhoneOff,
+  ChevronUp, ChevronDown, Volume2, Maximize2, Minimize2,
+  Hand, Users,
+} from "lucide-react";
+import { useI18n } from "@/i18n/I18nProvider";
 
 export default function VoiceGrid() {
+  const { t } = useI18n();
   const {
     livekitToken,
     activeVoiceChannelId,
@@ -63,6 +69,10 @@ export default function VoiceGrid() {
     currentMember?.role === "OWNER" ||
     currentMember?.role === "ADMIN"
   );
+
+  // channelMode: GENERAL=자유소통, MEETING=회의, LECTURE=강의
+  const channelMode = activeChannel?.mode ?? "GENERAL";
+  const isStructuredMode = channelMode === "MEETING" || channelMode === "LECTURE";
 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -360,18 +370,31 @@ export default function VoiceGrid() {
 
   const isConnected = connectionState === ConnectionState.Connected;
   const isConnecting = connectionState === ConnectionState.Connecting;
+
+  // i18n 연결 상태 레이블
   const connectionLabel = isConnected
-    ? "Voice Connected"
+    ? t("voice.status.connected")
     : isConnecting
-      ? "Voice Connecting"
+      ? t("voice.status.connecting")
       : connectionState === ConnectionState.Reconnecting ||
           connectionState === ConnectionState.SignalReconnecting
-        ? "Voice Reconnecting"
-        : "Voice Disconnected";
+        ? t("voice.status.reconnecting")
+        : t("voice.status.disconnected");
+
   const hasLocalScreenShare = isConnected && localMedia.hasScreenShare;
   const isEffectivelyMuted = !canPublish || isMuted;
   const visibleConnectionError = connectionError ||
     (!wsUrl ? "LiveKit URL이 설정되지 않았습니다." : null);
+
+  // 모드 레이블
+  const modeLabel = channelMode === "LECTURE"
+    ? t("voice.mode.lecture")
+    : channelMode === "MEETING"
+      ? t("voice.mode.meeting")
+      : t("voice.mode.general");
+
+  // 모드 아이콘 (이모지 → 의미있는 심볼)
+  const modeIcon = channelMode === "LECTURE" ? "🎓" : channelMode === "MEETING" ? "🤝" : "💬";
 
   return (
     <div
@@ -396,9 +419,9 @@ export default function VoiceGrid() {
           className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-surface hover:text-text"
         >
           {isCollapsed ? (
-            <><span>Show</span><ChevronDown className="h-3 w-3" /></>
+            <><span>{t("voice.control.show")}</span><ChevronDown className="h-3 w-3" /></>
           ) : (
-            <><span>Hide</span><ChevronUp className="h-3 w-3" /></>
+            <><span>{t("voice.control.hide")}</span><ChevronUp className="h-3 w-3" /></>
           )}
         </button>
       </div>
@@ -426,7 +449,7 @@ export default function VoiceGrid() {
                 }}
                 className="rounded-full bg-idle/15 px-3 py-1 text-xs font-semibold text-idle hover:bg-idle/25"
               >
-                오디오 재생 시작
+                {t("voice.control.startAudio")}
               </button>
             </div>
           )}
@@ -448,14 +471,14 @@ export default function VoiceGrid() {
                 {!isCameraOn && !hasLocalScreenShare && (
                   <div className="flex flex-col items-center gap-1">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-xs font-bold uppercase text-text">
-                      You
+                      {t("voice.floor.me")}
                     </div>
                   </div>
                 )}
               </div>
               <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-text backdrop-blur-xs">
                 {isEffectivelyMuted && <MicOff className="h-2.5 w-2.5 text-danger" />}
-                You
+                {t("voice.floor.me")}
               </div>
             </div>
 
@@ -531,138 +554,159 @@ export default function VoiceGrid() {
           </div>
 
           {/* Controls */}
-          <div className="flex items-center justify-center gap-3 py-2.5 border-t border-line">
+          <div className="flex items-center justify-center gap-3 py-2.5 border-t border-line flex-wrap px-3">
+            {/* Mic */}
             <ControlButton
               active={!isEffectivelyMuted}
               activeClass="bg-surface text-muted border-line hover:bg-surface-2"
               inactiveClass="bg-danger/10 text-danger border-danger/20"
               onClick={toggleMute}
-              title={canPublish ? (isMuted ? "Unmute" : "Mute") : "스테이지 청취자는 마이크를 사용할 수 없습니다"}
+              title={
+                canPublish
+                  ? (isMuted ? t("voice.control.unmute") : t("voice.control.mute"))
+                  : t("voice.error.noStagePublish")
+              }
               ariaPressed={isMuted}
               disabled={!canPublish || !isConnected}
             >
               {isEffectivelyMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
             </ControlButton>
 
+            {/* Camera */}
             <ControlButton
               active={isCameraOn}
               activeClass="bg-surface text-muted border-line hover:bg-surface-2"
               inactiveClass="bg-danger/10 text-danger border-danger/20"
               onClick={toggleCamera}
-              title={canPublish ? (isCameraOn ? "Camera Off" : "Camera On") : "스테이지 청취자는 카메라를 사용할 수 없습니다"}
+              title={
+                canPublish
+                  ? (isCameraOn ? t("voice.control.cameraOff") : t("voice.control.cameraOn"))
+                  : t("voice.error.noStageCam")
+              }
               ariaPressed={isCameraOn}
               disabled={!canPublish || !isConnected}
             >
               {isCameraOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
             </ControlButton>
 
+            {/* Screen share */}
             <ControlButton
               active={isScreenSharing}
               activeClass="bg-online/10 text-online border-online/20"
               inactiveClass="bg-surface text-muted border-line hover:bg-surface-2"
               onClick={toggleScreenShare}
-              title={canPublish ? "Share Screen" : "스테이지 청취자는 화면을 공유할 수 없습니다"}
+              title={canPublish ? t("voice.control.shareScreen") : t("voice.error.noStageScreen")}
               ariaPressed={isScreenSharing}
               disabled={!canPublish || !isConnected}
             >
               <Monitor className="h-4 w-4" />
             </ControlButton>
 
-            {/* Mode & Host Badge */}
+            {/* Mode Badge */}
             {activeChannel && (
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface border border-line text-[10px] font-bold text-accent">
-                <span>{activeChannel.mode === "LECTURE" ? "🎓 강의 모드" : activeChannel.mode === "MEETING" ? "🤝 회의 모드" : "💬 자유 모드"}</span>
+                <span>{modeIcon}</span>
+                <span>{modeLabel}</span>
                 {isHost && <span className="text-amber-400">👑</span>}
               </div>
             )}
 
-            {/* Mode & Floor Controls */}
-            <div className="h-5 w-px bg-surface-2" />
+            {/* ── MEETING / LECTURE 전용 컨트롤 (GENERAL에서는 숨김) ── */}
+            {isStructuredMode && (
+              <>
+                <div className="h-5 w-px bg-surface-2" />
 
-            {/* Raise Hand Button */}
-            <button
-              onClick={() => {
-                const nextState = !handRaised;
-                setHandRaised(nextState);
-                if (nextState && profile) {
-                  setFloorRequests((prev) => [...prev, { id: profile.id, name: profile.displayName || profile.username }]);
-                } else if (profile) {
-                  setFloorRequests((prev) => prev.filter((r) => r.id !== profile.id));
-                }
-              }}
-              title="발언권/질문 신청 (Raise Hand)"
-              className={`flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition active:scale-95 ${
-                handRaised
-                  ? "border-idle/50 bg-idle/20 text-idle shadow-md shadow-idle/20 animate-pulse"
-                  : "border-line bg-surface text-muted hover:bg-surface-2"
-              }`}
-            >
-              <span>🖐️</span>
-              <span>{handRaised ? "신청됨" : "발언 신청"}</span>
-            </button>
-
-            {/* Host Floor Management Panel Button */}
-            <div className="relative">
-              <button
-                onClick={() => setShowFloorPanel(!showFloorPanel)}
-                title="손든 학생/신청자 관리"
-                className="flex h-9 items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-500/10 px-3 text-xs font-semibold text-purple-300 hover:bg-purple-500/20 transition"
-              >
-                <span>👑</span>
-                <span>신청자 목록</span>
-                {floorRequests.length > 0 && (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-idle text-[10px] font-bold text-slate-950">
-                    {floorRequests.length}
-                  </span>
+                {/* Raise Hand — 본인이 host가 아닐 때 표시 */}
+                {!isHost && (
+                  <button
+                    onClick={() => {
+                      const nextState = !handRaised;
+                      setHandRaised(nextState);
+                      if (nextState && profile) {
+                        setFloorRequests((prev) => [...prev, { id: profile.id, name: profile.displayName || profile.username }]);
+                      } else if (profile) {
+                        setFloorRequests((prev) => prev.filter((r) => r.id !== profile.id));
+                      }
+                    }}
+                    title={t("voice.control.raiseHand")}
+                    className={`flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition active:scale-95 ${
+                      handRaised
+                        ? "border-idle/50 bg-idle/20 text-idle shadow-md shadow-idle/20 animate-pulse"
+                        : "border-line bg-surface text-muted hover:bg-surface-2"
+                    }`}
+                  >
+                    <Hand className="h-3.5 w-3.5" />
+                    <span>{handRaised ? t("voice.control.handRaised") : t("voice.control.raiseHand")}</span>
+                  </button>
                 )}
-              </button>
 
-              {/* Host Floor Requests Dropdown */}
-              {showFloorPanel && (
-                <div className="absolute bottom-12 right-0 w-72 rounded-2xl border border-line bg-surface p-4 shadow-2xl backdrop-blur-2xl z-50 text-left">
-                  <div className="flex items-center justify-between border-b border-line pb-2 mb-3">
-                    <span className="text-xs font-bold text-text flex items-center gap-1.5">
-                      <span>👑</span> 발언/질문 신청자 목록
-                    </span>
-                    <button onClick={() => setShowFloorPanel(false)} className="text-muted hover:text-text text-xs">✕</button>
-                  </div>
+                {/* Speaker Requests Panel — host 전용 */}
+                {isHost && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowFloorPanel(!showFloorPanel)}
+                      title={t("voice.control.speakerRequests")}
+                      className="flex h-9 items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-500/10 px-3 text-xs font-semibold text-purple-300 hover:bg-purple-500/20 transition"
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      <span>{t("voice.control.speakerRequests")}</span>
+                      {floorRequests.length > 0 && (
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-idle text-[10px] font-bold text-slate-950">
+                          {floorRequests.length}
+                        </span>
+                      )}
+                    </button>
 
-                  {floorRequests.length === 0 ? (
-                    <p className="py-4 text-center text-xs text-muted">현재 발언 신청자가 없습니다.</p>
-                  ) : (
-                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                      {floorRequests.map((req) => {
-                        const isGranted = grantedSpeakers.includes(req.id);
-                        return (
-                          <div key={req.id} className="flex items-center justify-between rounded-xl bg-surface p-2.5 text-xs">
-                            <span className="font-semibold text-text truncate max-w-[110px]">{req.name}</span>
-                            <div className="flex gap-1">
-                              {!isGranted ? (
-                                <button
-                                  onClick={() => setGrantedSpeakers((prev) => [...prev, req.id])}
-                                  className="rounded-lg bg-online px-2 py-1 text-[10px] font-bold text-on-accent hover:bg-online/90"
-                                >
-                                  발언 허용
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => setGrantedSpeakers((prev) => prev.filter((i) => i !== req.id))}
-                                  className="rounded-lg bg-danger/30 text-danger border border-danger/30 px-2 py-1 text-[10px] font-bold hover:bg-danger hover:text-on-accent"
-                                >
-                                  회수
-                                </button>
-                              )}
-                            </div>
+                    {/* Floor Request Dropdown */}
+                    {showFloorPanel && (
+                      <div className="absolute bottom-12 right-0 w-72 rounded-2xl border border-line bg-surface p-4 shadow-2xl backdrop-blur-2xl z-50 text-left">
+                        <div className="flex items-center justify-between border-b border-line pb-2 mb-3">
+                          <span className="text-xs font-bold text-text flex items-center gap-1.5">
+                            <Users className="h-3.5 w-3.5 text-purple-300" />
+                            {t("voice.floor.title")}
+                          </span>
+                          <button onClick={() => setShowFloorPanel(false)} className="text-muted hover:text-text text-xs">✕</button>
+                        </div>
+
+                        {floorRequests.length === 0 ? (
+                          <p className="py-4 text-center text-xs text-muted">{t("voice.floor.empty")}</p>
+                        ) : (
+                          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                            {floorRequests.map((req) => {
+                              const isGranted = grantedSpeakers.includes(req.id);
+                              return (
+                                <div key={req.id} className="flex items-center justify-between rounded-xl bg-surface p-2.5 text-xs">
+                                  <span className="font-semibold text-text truncate max-w-[110px]">{req.name}</span>
+                                  <div className="flex gap-1">
+                                    {!isGranted ? (
+                                      <button
+                                        onClick={() => setGrantedSpeakers((prev) => [...prev, req.id])}
+                                        className="rounded-lg bg-online px-2 py-1 text-[10px] font-bold text-on-accent hover:bg-online/90"
+                                      >
+                                        {t("voice.floor.allow")}
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => setGrantedSpeakers((prev) => prev.filter((i) => i !== req.id))}
+                                        className="rounded-lg bg-danger/30 text-danger border border-danger/30 px-2 py-1 text-[10px] font-bold hover:bg-danger hover:text-on-accent"
+                                      >
+                                        {t("voice.floor.revoke")}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
 
-            {/* Fullscreen Toggle Button */}
+            {/* Fullscreen Toggle — Lucide 아이콘으로 교체 (Issue #106) */}
             <button
               onClick={() => {
                 if (!document.fullscreenElement) {
@@ -673,19 +717,24 @@ export default function VoiceGrid() {
                   setIsFullscreen(false);
                 }
               }}
-              title="전체화면 (Fullscreen)"
+              title={isFullscreen ? t("voice.control.exitFullscreen") : t("voice.control.fullscreen")}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-muted hover:bg-surface-2 transition"
             >
-              <span>{isFullscreen ? "↙️" : "↗️"}</span>
+              {isFullscreen
+                ? <Minimize2 className="h-4 w-4" />
+                : <Maximize2 className="h-4 w-4" />
+              }
             </button>
 
             <div className="h-5 w-px bg-surface-2" />
 
+            {/* Leave */}
             <button
               onClick={leaveVoiceChannel}
               className="flex h-9 items-center gap-1.5 rounded-full bg-danger px-4 text-xs font-bold text-on-accent shadow-lg shadow-[0_4px_12px_-2px_var(--danger)] hover:bg-danger/90 active:scale-95"
             >
-              <PhoneOff className="h-3.5 w-3.5" /> Leave
+              <PhoneOff className="h-3.5 w-3.5" />
+              {t("voice.control.leave")}
             </button>
           </div>
         </div>
