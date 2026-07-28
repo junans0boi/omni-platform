@@ -99,6 +99,8 @@ export function SettingsModal({
   const [isTestingVideo, setIsTestingVideo] = useState<boolean>(false);
   const [alwaysPreviewVideo, setAlwaysPreviewVideo] = useState<boolean>(true);
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
+  const [cameraVirtualBgLocal, setCameraVirtualBgLocal] = useState<"none" | "blur" | "office" | "cafe">("none");
+  const [screenPresetLocal, setScreenPresetLocal] = useState<"720p" | "1080p60">("1080p60");
 
   // Language & Time State
   const [timeFormat, setTimeFormat] = useState<"auto" | "12h" | "24h">("auto");
@@ -1161,29 +1163,45 @@ export function SettingsModal({
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => updatePreference({ cameraVirtualBg: "none" })}
-                      className="p-2.5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-muted text-left text-xs font-bold"
+                      onClick={() => { setCameraVirtualBgLocal("none"); updatePreference({ cameraVirtualBg: "none" }); }}
+                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition ${
+                        cameraVirtualBgLocal === "none"
+                          ? "border-accent bg-accent-soft text-text shadow-sm"
+                          : "border-line bg-surface hover:bg-surface-2 text-muted"
+                      }`}
                     >
                       <span>📷 원본 (효과 없음)</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => updatePreference({ cameraVirtualBg: "blur" })}
-                      className="p-2.5 rounded-xl border border-accent bg-accent-soft text-text text-left text-xs font-bold"
+                      onClick={() => { setCameraVirtualBgLocal("blur"); updatePreference({ cameraVirtualBg: "blur" }); }}
+                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition ${
+                        cameraVirtualBgLocal === "blur"
+                          ? "border-accent bg-accent-soft text-text shadow-sm"
+                          : "border-line bg-surface hover:bg-surface-2 text-muted"
+                      }`}
                     >
                       <span>✨ 배경 블러 (Blur)</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => updatePreference({ cameraVirtualBg: "office" })}
-                      className="p-2.5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-muted text-left text-xs font-bold"
+                      onClick={() => { setCameraVirtualBgLocal("office"); updatePreference({ cameraVirtualBg: "office" }); }}
+                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition ${
+                        cameraVirtualBgLocal === "office"
+                          ? "border-accent bg-accent-soft text-text shadow-sm"
+                          : "border-line bg-surface hover:bg-surface-2 text-muted"
+                      }`}
                     >
                       <span>🏢 모던 사무실</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => updatePreference({ cameraVirtualBg: "cafe" })}
-                      className="p-2.5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-muted text-left text-xs font-bold"
+                      onClick={() => { setCameraVirtualBgLocal("cafe"); updatePreference({ cameraVirtualBg: "cafe" }); }}
+                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition ${
+                        cameraVirtualBgLocal === "cafe"
+                          ? "border-accent bg-accent-soft text-text shadow-sm"
+                          : "border-line bg-surface hover:bg-surface-2 text-muted"
+                      }`}
                     >
                       <span>☕ 아늑한 카페</span>
                     </button>
@@ -1199,15 +1217,23 @@ export function SettingsModal({
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => updatePreference({ screenPreset: "720p" })}
-                      className="p-2.5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-muted text-left text-xs font-bold"
+                      onClick={() => { setScreenPresetLocal("720p"); updatePreference({ screenPreset: "720p" }); }}
+                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition ${
+                        screenPresetLocal === "720p"
+                          ? "border-accent bg-accent-soft text-text shadow-sm"
+                          : "border-line bg-surface hover:bg-surface-2 text-muted"
+                      }`}
                     >
                       <span>HD (720p 30fps)</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => updatePreference({ screenPreset: "1080p60" })}
-                      className="p-2.5 rounded-xl border border-accent bg-accent-soft text-text text-left text-xs font-bold"
+                      onClick={() => { setScreenPresetLocal("1080p60"); updatePreference({ screenPreset: "1080p60" }); }}
+                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition ${
+                        screenPresetLocal === "1080p60"
+                          ? "border-accent bg-accent-soft text-text shadow-sm"
+                          : "border-line bg-surface hover:bg-surface-2 text-muted"
+                      }`}
                     >
                       <span>FHD (1080p 60fps) 🔥</span>
                     </button>

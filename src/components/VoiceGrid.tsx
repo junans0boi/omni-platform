@@ -416,12 +416,16 @@ export default function VoiceGrid() {
   useEffect(() => {
     const room = roomRef.current;
     if (!room || connectionState !== ConnectionState.Connected || !canPublish) return;
-    room.localParticipant.setScreenShareEnabled(isScreenSharing).then(() => {
+    const screenCaptureOptions = screenPreset === "1080p60"
+      ? { resolution: { width: 1920, height: 1080, frameRate: 60 }, audio: true }
+      : { resolution: { width: 1280, height: 720, frameRate: 30 }, audio: true };
+
+    room.localParticipant.setScreenShareEnabled(isScreenSharing, screenCaptureOptions).then(() => {
       if (screenShareInitRef.current)
         getSoundEffects()?.emit(isScreenSharing ? "SCREEN_SHARE_STARTED" : "SCREEN_SHARE_STOPPED");
       screenShareInitRef.current = true;
     }).catch((e) => console.warn("Screen share error:", e.message));
-  }, [canPublish, connectionState, isScreenSharing]);
+  }, [canPublish, connectionState, isScreenSharing, screenPreset]);
 
   // ── Attach local video track ──────────────────────────────────────────────
   useEffect(() => {
@@ -642,7 +646,24 @@ export default function VoiceGrid() {
                 ? "border-online shadow-md shadow-online/20"
                 : "border-line"
             }`}>
-              <div ref={localVideoRef} className="h-full w-full flex items-center justify-center">
+              <div
+                ref={localVideoRef}
+                className={`h-full w-full flex items-center justify-center relative transition-all duration-300 ${
+                  cameraBg === "blur"
+                    ? "[&_video]:blur-md [&_video]:brightness-95"
+                    : cameraBg === "office"
+                    ? "[&_video]:contrast-110 [&_video]:brightness-90 bg-slate-900/80"
+                    : cameraBg === "cafe"
+                    ? "[&_video]:sepia-20 [&_video]:brightness-95 bg-amber-950/40"
+                    : ""
+                }`}
+              >
+                {/* 가상 배경 오버레이 배지 시각화 */}
+                {isCameraOn && cameraBg !== "none" && (
+                  <div className="absolute top-2 left-2 z-10 rounded bg-black/60 backdrop-blur-md px-1.5 py-0.5 text-[9px] font-bold text-accent border border-accent/30 animate-fade-in">
+                    {cameraBg === "blur" ? "✨ 블러 배경" : cameraBg === "office" ? "🏢 모던 사무실" : "☕ 아늑한 카페"}
+                  </div>
+                )}
                 {!isCameraOn && !hasLocalScreenShare && (
                   <div className="flex flex-col items-center gap-1">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-xs font-bold uppercase text-text">
