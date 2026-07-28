@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react";
 import {
   ConnectionState,
   Room,
@@ -24,6 +24,34 @@ import {
   Hand, Users,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Issue #102: LiveKit DataChannel 기반 발언권 제어 메시지 타입
+// ─────────────────────────────────────────────────────────────────────────────
+type FloorMsgType = "FLOOR_REQUEST" | "FLOOR_CANCEL" | "FLOOR_GRANT" | "FLOOR_REVOKE";
+
+interface FloorMessage {
+  type: FloorMsgType;
+  /** 요청자/대상자의 participant.identity */
+  identity: string;
+  /** 표시 이름 (REQUEST 시 함께 전달) */
+  name?: string;
+}
+
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+function encodeFloor(msg: FloorMessage): Uint8Array<ArrayBuffer> {
+  return enc.encode(JSON.stringify(msg)) as Uint8Array<ArrayBuffer>;
+}
+
+function decodeFloor(data: Uint8Array): FloorMessage | null {
+  try {
+    return JSON.parse(dec.decode(data)) as FloorMessage;
+  } catch {
+    return null;
+  }
+}
 
 export default function VoiceGrid() {
   const { t } = useI18n();
@@ -70,16 +98,21 @@ export default function VoiceGrid() {
     currentMember?.role === "ADMIN"
   );
 
-  // channelMode: GENERAL=자유소통, MEETING=회의, LECTURE=강의
   const channelMode = activeChannel?.mode ?? "GENERAL";
   const isStructuredMode = channelMode === "MEETING" || channelMode === "LECTURE";
 
+  // ── State ──────────────────────────────────────────────────────────────────
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [floorRequests, setFloorRequests] = useState<{ id: string; name: string }[]>([]);
+
+  // Issue #102: 발언권 — DataChannel 연동
+  const [floorRequests, setFloorRequests] = useState<{ identity: string; name: string }[]>([]);
   const [grantedSpeakers, setGrantedSpeakers] = useState<string[]>([]);
-  const [showFloorPanel, setShowFloorPanel] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
+  /** 내 발언이 허용/거부됐을 때 표시할 토스트 메시지 */
+  const [floorToast, setFloorToast] = useState<{ text: string; ok: boolean } | null>(null);
+  const [showFloorPanel, setShowFloorPanel] = useState(false);
+
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
   const [activeSpeakerSids, setActiveSpeakerSids] = useState<string[]>([]);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -87,10 +120,7 @@ export default function VoiceGrid() {
     ConnectionState.Disconnected
   );
   const [localParticipantSid, setLocalParticipantSid] = useState("");
-  const [localMedia, setLocalMedia] = useState({
-    revision: 0,
-    hasScreenShare: false,
-  });
+  const [localMedia, setLocalMedia] = useState({ revision: 0, hasScreenShare: false });
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [participantVolumeOverride, setParticipantVolumeOverride] = useState<{
     profileId: string;
@@ -98,6 +128,7 @@ export default function VoiceGrid() {
   } | null>(null);
   const [documentVisibility, setDocumentVisibility] =
     useState<DocumentVisibilityState>(currentDocumentVisibility);
+
   const roomRef = useRef<Room | null>(null);
   const muteInitializedRef = useRef(false);
   const localVideoRef = useRef<HTMLDivElement>(null);
@@ -105,6 +136,13 @@ export default function VoiceGrid() {
   const canPublish = getCanPublish(livekitToken);
   const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "";
   const renderVideo = shouldRenderVideo(isCollapsed, documentVisibility);
+
+  // ── 토스트 자동 소멸 ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!floorToast) return;
+    const timer = setTimeout(() => setFloorToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [floorToast]);
 
   const storedParticipantVolumes = useMemo(
     () => profile && typeof window !== "undefined"
@@ -122,9 +160,7 @@ export default function VoiceGrid() {
     setParticipantVolumeOverride({ profileId: profile.id, values: next });
     try {
       writeParticipantVolumes(profile.id, next, window.localStorage);
-    } catch {
-      // Local storage can be unavailable; the listener-local in-memory gain still applies.
-    }
+    } catch { /* localStorage unavailable */ }
   };
 
   useEffect(() => {
@@ -133,10 +169,19 @@ export default function VoiceGrid() {
     return () => document.removeEventListener("visibilitychange", syncVisibility);
   }, []);
 
+  // ── DataChannel 메시지 발행 헬퍼 ─────────────────────────────────────────
+  const publishFloor = useCallback((msg: FloorMessage) => {
+    const room = roomRef.current;
+    if (!room || room.state !== ConnectionState.Connected) return;
+    room.localParticipant.publishData(encodeFloor(msg), {
+      reliable: true,
+      // 전체 브로드캐스트 (특정 참여자만 지정하지 않음)
+    });
+  }, []);
+
   // ── Connect / Disconnect ──────────────────────────────────────────────────
   useEffect(() => {
     if (!livekitToken || !activeVoiceChannelId) return;
-
     if (!wsUrl) {
       console.error("NEXT_PUBLIC_LIVEKIT_URL is not set in .env.local");
       return;
@@ -146,59 +191,107 @@ export default function VoiceGrid() {
     roomRef.current = room;
     let disposed = false;
 
-    // livekit-client v2.x uses remoteParticipants (Map<string, RemoteParticipant>)
-    const syncParticipants = () => {
+    const syncParticipants = () =>
       setRemoteParticipants(Array.from(room.remoteParticipants.values()));
-    };
 
     room.on(RoomEvent.ParticipantConnected, () => {
       syncParticipants();
       getSoundEffects()?.emit("REMOTE_JOINED");
     });
-    room.on(RoomEvent.ParticipantDisconnected, () => {
+    room.on(RoomEvent.ParticipantDisconnected, (p) => {
       syncParticipants();
       getSoundEffects()?.emit("REMOTE_LEFT");
+      // 나간 참여자의 발언 신청 정리
+      setFloorRequests((prev) => prev.filter((r) => r.identity !== p.identity));
+      setGrantedSpeakers((prev) => prev.filter((i) => i !== p.identity));
     });
     room.on(RoomEvent.TrackSubscribed, syncParticipants);
     room.on(RoomEvent.TrackUnsubscribed, syncParticipants);
     room.on(RoomEvent.TrackMuted, syncParticipants);
     room.on(RoomEvent.TrackUnmuted, syncParticipants);
     room.on(RoomEvent.ConnectionStateChanged, setConnectionState);
+
     const syncLocalMedia = () => {
       const hasScreenShare = Array.from(
         room.localParticipant.trackPublications.values()
-      ).some(
-        (publication) =>
-          publication.source === Track.Source.ScreenShare &&
-          !publication.isMuted
-      );
-      setLocalMedia((media) => ({
-        revision: media.revision + 1,
-        hasScreenShare,
-      }));
+      ).some((p) => p.source === Track.Source.ScreenShare && !p.isMuted);
+      setLocalMedia((m) => ({ revision: m.revision + 1, hasScreenShare }));
     };
     room.on(RoomEvent.LocalTrackPublished, syncLocalMedia);
     room.on(RoomEvent.LocalTrackUnpublished, syncLocalMedia);
-    room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
-      setAudioBlocked(!room.canPlaybackAudio);
-    });
-    room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
-      setActiveSpeakerSids(speakers.map((s) => s.sid));
-    });
+    room.on(RoomEvent.AudioPlaybackStatusChanged, () =>
+      setAudioBlocked(!room.canPlaybackAudio)
+    );
+    room.on(RoomEvent.ActiveSpeakersChanged, (speakers) =>
+      setActiveSpeakerSids(speakers.map((s) => s.sid))
+    );
     room.on(RoomEvent.Disconnected, () => {
       setRemoteParticipants([]);
       setLocalParticipantSid("");
+      setFloorRequests([]);
+      setGrantedSpeakers([]);
     });
+
+    // ── Issue #102: DataChannel 수신 핸들러 ─────────────────────────────────
+    room.on(
+      RoomEvent.DataReceived,
+      (payload: Uint8Array<ArrayBuffer>, _participant, _kind) => {
+        const msg = decodeFloor(payload);
+        if (!msg) return;
+        const myIdentity = room.localParticipant.identity;
+
+        switch (msg.type) {
+          // ─── 비-호스트가 발언 신청 브로드캐스트 → 호스트 목록에 추가 ───
+          case "FLOOR_REQUEST":
+            setFloorRequests((prev) => {
+              if (prev.some((r) => r.identity === msg.identity)) return prev;
+              return [...prev, { identity: msg.identity, name: msg.name ?? msg.identity }];
+            });
+            break;
+
+          // ─── 비-호스트가 신청 취소 → 목록에서 제거 ──────────────────────
+          case "FLOOR_CANCEL":
+            setFloorRequests((prev) => prev.filter((r) => r.identity !== msg.identity));
+            setGrantedSpeakers((prev) => prev.filter((i) => i !== msg.identity));
+            break;
+
+          // ─── 호스트가 발언 허용 → 본인이면 마이크 켜기 + 토스트 ─────────
+          case "FLOOR_GRANT":
+            setGrantedSpeakers((prev) =>
+              prev.includes(msg.identity) ? prev : [...prev, msg.identity]
+            );
+            if (msg.identity === myIdentity) {
+              // 내 마이크를 unmute (canPublish 여부와 무관하게 직접 활성화)
+              room.localParticipant.setMicrophoneEnabled(true).catch((e) =>
+                console.warn("Floor grant mic error:", e.message)
+              );
+              setHandRaised(false);
+              setFloorToast({ text: "발언이 허용되었습니다. 마이크가 켜졌습니다.", ok: true });
+            }
+            break;
+
+          // ─── 호스트가 발언 회수 → 본인이면 마이크 끄기 + 토스트 ─────────
+          case "FLOOR_REVOKE":
+            setGrantedSpeakers((prev) => prev.filter((i) => i !== msg.identity));
+            setFloorRequests((prev) => prev.filter((r) => r.identity !== msg.identity));
+            if (msg.identity === myIdentity) {
+              room.localParticipant.setMicrophoneEnabled(false).catch((e) =>
+                console.warn("Floor revoke mic error:", e.message)
+              );
+              setHandRaised(false);
+              setFloorToast({ text: "발언 권한이 회수되었습니다.", ok: false });
+            }
+            break;
+        }
+      }
+    );
 
     const connect = async () => {
       setConnectionError(null);
       setAudioBlocked(false);
       try {
         await room.connect(wsUrl, livekitToken);
-        if (disposed) {
-          await room.disconnect();
-          return;
-        }
+        if (disposed) { await room.disconnect(); return; }
         setLocalParticipantSid(room.localParticipant.sid);
         setAudioBlocked(!room.canPlaybackAudio);
         syncParticipants();
@@ -210,14 +303,12 @@ export default function VoiceGrid() {
         setConnectionState(ConnectionState.Disconnected);
       }
     };
-
     connect();
 
     return () => {
       disposed = true;
-      if (room.state === ConnectionState.Connected) {
+      if (room.state === ConnectionState.Connected)
         getSoundEffects()?.emit("LOCAL_DISCONNECTED");
-      }
       room.removeAllListeners();
       room.disconnect();
       roomRef.current = null;
@@ -232,9 +323,8 @@ export default function VoiceGrid() {
     const room = roomRef.current;
     if (!room || connectionState !== ConnectionState.Connected || !canPublish) return;
     room.localParticipant.setMicrophoneEnabled(!isMuted).then(() => {
-      if (muteInitializedRef.current) {
+      if (muteInitializedRef.current)
         getSoundEffects()?.emit(isMuted ? "LOCAL_MUTED" : "LOCAL_UNMUTED");
-      }
       muteInitializedRef.current = true;
     }).catch((e) => console.warn("Mic toggle error:", e.message));
   }, [canPublish, connectionState, isMuted]);
@@ -243,9 +333,8 @@ export default function VoiceGrid() {
   useEffect(() => {
     const room = roomRef.current;
     if (!room || connectionState !== ConnectionState.Connected || !canPublish) return;
-    room.localParticipant.setCameraEnabled(isCameraOn).catch((e) =>
-      console.warn("Camera toggle error:", e.message)
-    );
+    room.localParticipant.setCameraEnabled(isCameraOn)
+      .catch((e) => console.warn("Camera toggle error:", e.message));
   }, [canPublish, connectionState, isCameraOn]);
 
   // ── Screen share toggle ───────────────────────────────────────────────────
@@ -253,13 +342,10 @@ export default function VoiceGrid() {
     const room = roomRef.current;
     if (!room || connectionState !== ConnectionState.Connected || !canPublish) return;
     room.localParticipant.setScreenShareEnabled(isScreenSharing).then(() => {
-      if (screenShareInitRef.current) {
+      if (screenShareInitRef.current)
         getSoundEffects()?.emit(isScreenSharing ? "SCREEN_SHARE_STARTED" : "SCREEN_SHARE_STOPPED");
-      }
       screenShareInitRef.current = true;
-    }).catch((e) =>
-      console.warn("Screen share error:", e.message)
-    );
+    }).catch((e) => console.warn("Screen share error:", e.message));
   }, [canPublish, connectionState, isScreenSharing]);
 
   // ── Attach local video track ──────────────────────────────────────────────
@@ -268,102 +354,71 @@ export default function VoiceGrid() {
     const container = localVideoRef.current;
     if (!room || !container || !renderVideo) return;
 
-    const videoPublications = Array.from(
-      room.localParticipant.trackPublications.values()
-    ).filter((publication) => publication.track?.kind === Track.Kind.Video);
-    const screenShare = videoPublications.find(
-      (publication) => publication.source === Track.Source.ScreenShare
-    );
-    const visiblePublications = screenShare
+    const publications = Array.from(room.localParticipant.trackPublications.values())
+      .filter((p) => p.track?.kind === Track.Kind.Video);
+    const screenShare = publications.find((p) => p.source === Track.Source.ScreenShare);
+    const visible = screenShare
       ? [screenShare]
-      : videoPublications.filter(
-          (publication) => publication.source === Track.Source.Camera
-        );
-    const attachedMedia = visiblePublications
-      .flatMap((publication) => {
-        if (!publication.track) return [];
-        const element = publication.track.attach();
-        element.className = `absolute inset-0 h-full w-full rounded-lg object-cover ${
-          publication.source === Track.Source.Camera ? "scale-x-[-1]" : ""
-        }`;
-        container.appendChild(element);
-        return [{ track: publication.track, element }];
-      });
+      : publications.filter((p) => p.source === Track.Source.Camera);
 
-    return () => {
-      attachedMedia.forEach(({ track, element }) => {
-        track.detach(element);
-        element.remove();
-      });
-    };
+    const attached = visible.flatMap((pub) => {
+      if (!pub.track) return [];
+      const el = pub.track.attach();
+      el.className = `absolute inset-0 h-full w-full rounded-lg object-cover ${
+        pub.source === Track.Source.Camera ? "scale-x-[-1]" : ""
+      }`;
+      container.appendChild(el);
+      return [{ track: pub.track, element: el }];
+    });
+
+    return () => attached.forEach(({ track, element }) => {
+      track.detach(element);
+      element.remove();
+    });
   }, [activeVoiceChannelId, livekitToken, localMedia.revision, renderVideo]);
 
-  // Keep remote audio attached even while the visual grid is collapsed.
+  // ── Remote audio (always attached even when collapsed) ───────────────────
   useEffect(() => {
-    const attachedMedia = remoteParticipants.flatMap((p) => {
+    const attached = remoteParticipants.flatMap((p) => {
       const container = remoteVideoRefs.current[p.sid];
       if (!container) return [];
-
-      return Array.from(p.trackPublications.values()).flatMap((publication) => {
-        if (
-          !publication.track ||
-          !publication.isSubscribed ||
-          publication.track.kind !== Track.Kind.Audio
-        ) {
-          return [];
-        }
-        const element = publication.track.attach();
-        element.volume = (participantVolumes[p.identity] ?? DEFAULT_PARTICIPANT_VOLUME) / 100;
-        container.appendChild(element);
-        return [{ track: publication.track, element }];
+      return Array.from(p.trackPublications.values()).flatMap((pub) => {
+        if (!pub.track || !pub.isSubscribed || pub.track.kind !== Track.Kind.Audio) return [];
+        const el = pub.track.attach();
+        el.volume = (participantVolumes[p.identity] ?? DEFAULT_PARTICIPANT_VOLUME) / 100;
+        container.appendChild(el);
+        return [{ track: pub.track, element: el }];
       });
     });
-
-    return () => {
-      attachedMedia.forEach(({ track, element }) => {
-        track.detach(element);
-        element.remove();
-      });
-    };
+    return () => attached.forEach(({ track, element }) => {
+      track.detach(element);
+      element.remove();
+    });
   }, [participantVolumes, remoteParticipants]);
 
-  // Prefer screen share over camera so the emphasized tile cannot be obscured.
+  // ── Remote video ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!renderVideo) return;
-
-    const attachedMedia = remoteParticipants.flatMap((participant) => {
+    const attached = remoteParticipants.flatMap((participant) => {
       const container = remoteVideoRefs.current[participant.sid];
       if (!container) return [];
-
-      const publications = Array.from(participant.trackPublications.values());
-      const screenShare = publications.find(
-        (publication) =>
-          publication.source === Track.Source.ScreenShare &&
-          publication.track?.kind === Track.Kind.Video &&
-          !publication.isMuted &&
-          publication.isSubscribed
+      const pubs = Array.from(participant.trackPublications.values());
+      const screenShare = pubs.find(
+        (p) => p.source === Track.Source.ScreenShare && p.track?.kind === Track.Kind.Video && !p.isMuted && p.isSubscribed
       );
-      const visibleVideo = screenShare || publications.find(
-        (publication) =>
-          publication.source === Track.Source.Camera &&
-          publication.track?.kind === Track.Kind.Video &&
-          !publication.isMuted &&
-          publication.isSubscribed
+      const visible = screenShare || pubs.find(
+        (p) => p.source === Track.Source.Camera && p.track?.kind === Track.Kind.Video && !p.isMuted && p.isSubscribed
       );
-      if (!visibleVideo?.track) return [];
-
-      const element = visibleVideo.track.attach();
-      element.className = "absolute inset-0 h-full w-full rounded-lg object-cover";
-      container.appendChild(element);
-      return [{ track: visibleVideo.track, element }];
+      if (!visible?.track) return [];
+      const el = visible.track.attach();
+      el.className = "absolute inset-0 h-full w-full rounded-lg object-cover";
+      container.appendChild(el);
+      return [{ track: visible.track, element: el }];
     });
-
-    return () => {
-      attachedMedia.forEach(({ track, element }) => {
-        track.detach(element);
-        element.remove();
-      });
-    };
+    return () => attached.forEach(({ track, element }) => {
+      track.detach(element);
+      element.remove();
+    });
   }, [remoteParticipants, renderVideo]);
 
   if (!activeVoiceChannelId || !livekitToken) return null;
@@ -371,7 +426,6 @@ export default function VoiceGrid() {
   const isConnected = connectionState === ConnectionState.Connected;
   const isConnecting = connectionState === ConnectionState.Connecting;
 
-  // i18n 연결 상태 레이블
   const connectionLabel = isConnected
     ? t("voice.status.connected")
     : isConnecting
@@ -386,29 +440,81 @@ export default function VoiceGrid() {
   const visibleConnectionError = connectionError ||
     (!wsUrl ? "LiveKit URL이 설정되지 않았습니다." : null);
 
-  // 모드 레이블
   const modeLabel = channelMode === "LECTURE"
     ? t("voice.mode.lecture")
     : channelMode === "MEETING"
       ? t("voice.mode.meeting")
       : t("voice.mode.general");
 
-  // 모드 아이콘 (이모지 → 의미있는 심볼)
   const modeIcon = channelMode === "LECTURE" ? "🎓" : channelMode === "MEETING" ? "🤝" : "💬";
+
+  // ── 손들기 핸들러 (DataChannel 브로드캐스트) ──────────────────────────────
+  const handleRaiseHand = () => {
+    if (!profile) return;
+    const myIdentity = roomRef.current?.localParticipant.identity ?? profile.id;
+    const nextState = !handRaised;
+    setHandRaised(nextState);
+    if (nextState) {
+      publishFloor({
+        type: "FLOOR_REQUEST",
+        identity: myIdentity,
+        name: profile.displayName || profile.username,
+      });
+      // 내 발언 신청 목록에도 추가 (호스트 본인이 직접 보려는 경우 대비)
+      setFloorRequests((prev) => {
+        if (prev.some((r) => r.identity === myIdentity)) return prev;
+        return [...prev, { identity: myIdentity, name: profile.displayName || profile.username }];
+      });
+    } else {
+      publishFloor({ type: "FLOOR_CANCEL", identity: myIdentity });
+      setFloorRequests((prev) => prev.filter((r) => r.identity !== myIdentity));
+      setGrantedSpeakers((prev) => prev.filter((i) => i !== myIdentity));
+    }
+  };
+
+  // ── 발언 허용 핸들러 (호스트 전용) ──────────────────────────────────────
+  const handleGrant = (identity: string) => {
+    setGrantedSpeakers((prev) => prev.includes(identity) ? prev : [...prev, identity]);
+    publishFloor({ type: "FLOOR_GRANT", identity });
+  };
+
+  // ── 발언 회수 핸들러 (호스트 전용) ──────────────────────────────────────
+  const handleRevoke = (identity: string) => {
+    setGrantedSpeakers((prev) => prev.filter((i) => i !== identity));
+    setFloorRequests((prev) => prev.filter((r) => r.identity !== identity));
+    publishFloor({ type: "FLOOR_REVOKE", identity });
+  };
+
+  const myIdentity = roomRef.current?.localParticipant.identity ?? "";
+  const iAmGranted = grantedSpeakers.includes(myIdentity);
 
   return (
     <div
       className="border-b border-line bg-black/40 backdrop-blur-md"
       data-livekit-video-rendering={renderVideo ? "active" : "paused"}
     >
+      {/* ── Floor Toast Notification ─────────────────────────────────────── */}
+      {floorToast && (
+        <div
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold border-b ${
+            floorToast.ok
+              ? "bg-online/10 border-online/20 text-online"
+              : "bg-danger/10 border-danger/20 text-danger"
+          } animate-in slide-in-from-top-2 duration-200`}
+        >
+          {floorToast.ok ? "✅" : "🚫"}
+          {floorToast.text}
+          <button
+            onClick={() => setFloorToast(null)}
+            className="ml-auto text-inherit opacity-70 hover:opacity-100"
+          >✕</button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex h-9 items-center justify-between px-4">
         <span className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-          <span
-            className={`h-2 w-2 rounded-full ${
-              isConnected ? "animate-pulse bg-online" : "bg-idle"
-            }`}
-          />
+          <span className={`h-2 w-2 rounded-full ${isConnected ? "animate-pulse bg-online" : "bg-idle"}`} />
           {connectionLabel}
           {visibleConnectionError && (
             <span className="ml-2 text-danger">— {visibleConnectionError}</span>
@@ -418,20 +524,17 @@ export default function VoiceGrid() {
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-surface hover:text-text"
         >
-          {isCollapsed ? (
-            <><span>{t("voice.control.show")}</span><ChevronDown className="h-3 w-3" /></>
-          ) : (
-            <><span>{t("voice.control.hide")}</span><ChevronUp className="h-3 w-3" /></>
-          )}
+          {isCollapsed
+            ? <><span>{t("voice.control.show")}</span><ChevronDown className="h-3 w-3" /></>
+            : <><span>{t("voice.control.hide")}</span><ChevronUp className="h-3 w-3" /></>
+          }
         </button>
       </div>
 
       {/* Grid */}
-      <div
-        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
-          isCollapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
-        }`}
-      >
+      <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
+        isCollapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
+      }`}>
         <div className="overflow-hidden">
           {audioBlocked && (
             <div className="flex justify-center px-3 pt-2">
@@ -453,36 +556,40 @@ export default function VoiceGrid() {
               </button>
             </div>
           )}
+
+          {/* Participant Grid */}
           <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-4">
-            {/* Local participant tile */}
-            <div
-              className={`relative aspect-video overflow-hidden rounded-xl border bg-surface ${
-                hasLocalScreenShare ? "col-span-2" : ""
-              } ${
-                activeSpeakerSids.includes(localParticipantSid)
-                  ? "border-online shadow-md shadow-online/20"
-                  : "border-line"
-              }`}
-            >
-              <div
-                ref={localVideoRef}
-                className="h-full w-full flex items-center justify-center"
-              >
+            {/* Local tile */}
+            <div className={`relative aspect-video overflow-hidden rounded-xl border bg-surface ${
+              hasLocalScreenShare ? "col-span-2" : ""
+            } ${
+              activeSpeakerSids.includes(localParticipantSid)
+                ? "border-online shadow-md shadow-online/20"
+                : "border-line"
+            }`}>
+              <div ref={localVideoRef} className="h-full w-full flex items-center justify-center">
                 {!isCameraOn && !hasLocalScreenShare && (
                   <div className="flex flex-col items-center gap-1">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-xs font-bold uppercase text-text">
                       {t("voice.floor.me")}
                     </div>
+                    {/* 발언 허용됐을 때 글로우 표시 */}
+                    {iAmGranted && (
+                      <span className="mt-1 text-[9px] font-bold text-online animate-pulse">
+                        {t("voice.floor.granted")}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
               <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-text backdrop-blur-xs">
                 {isEffectivelyMuted && <MicOff className="h-2.5 w-2.5 text-danger" />}
                 {t("voice.floor.me")}
+                {iAmGranted && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-online animate-pulse" />}
               </div>
             </div>
 
-            {/* Remote participant tiles */}
+            {/* Remote tiles */}
             {remoteParticipants.map((p) => {
               const isSpeaking = activeSpeakerSids.includes(p.sid);
               const hasVideo = Array.from(p.trackPublications.values()).some(
@@ -492,17 +599,15 @@ export default function VoiceGrid() {
                 (pub) => pub.track?.kind === Track.Kind.Audio && pub.isMuted
               );
               const hasAudio = Array.from(p.trackPublications.values()).some(
-                (pub) =>
-                  pub.track?.kind === Track.Kind.Audio &&
-                  pub.isSubscribed &&
-                  !pub.isMuted
+                (pub) => pub.track?.kind === Track.Kind.Audio && pub.isSubscribed && !pub.isMuted
               );
               const hasScreenShare = Array.from(p.trackPublications.values()).some(
-                (pub) =>
-                  pub.source === Track.Source.ScreenShare &&
-                  !pub.isMuted &&
-                  pub.isSubscribed
+                (pub) => pub.source === Track.Source.ScreenShare && !pub.isMuted && pub.isSubscribed
               );
+              // 이 참여자가 발언 허용된 상태인지
+              const pIsGranted = grantedSpeakers.includes(p.identity);
+              // 이 참여자가 발언 신청 중인지
+              const pHandRaised = floorRequests.some((r) => r.identity === p.identity);
 
               return (
                 <div
@@ -512,11 +617,7 @@ export default function VoiceGrid() {
                   data-livekit-video-source={hasScreenShare ? "screen_share" : hasVideo ? "camera" : "none"}
                   className={`relative aspect-video overflow-hidden rounded-xl border bg-surface ${
                     hasScreenShare ? "col-span-2" : ""
-                  } ${
-                    isSpeaking
-                      ? "border-online shadow-md shadow-online/20"
-                      : "border-line"
-                  }`}
+                  } ${isSpeaking ? "border-online shadow-md shadow-online/20" : "border-line"}`}
                 >
                   <div
                     ref={(el) => {
@@ -531,6 +632,21 @@ export default function VoiceGrid() {
                       </div>
                     )}
                   </div>
+
+                  {/* 발언 신청 중 표시 — 손 아이콘 */}
+                  {pHandRaised && !pIsGranted && (
+                    <div className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-idle/80 text-[11px] animate-bounce" title="발언 신청 중">
+                      ✋
+                    </div>
+                  )}
+                  {/* 발언 허용됨 표시 */}
+                  {pIsGranted && (
+                    <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded-full bg-online/80 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                      <Mic className="h-2.5 w-2.5" />
+                      {t("voice.floor.granted")}
+                    </div>
+                  )}
+
                   <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-text backdrop-blur-xs">
                     {isMutedRemote && <MicOff className="h-2.5 w-2.5 text-danger" />}
                     {p.name || p.identity}
@@ -539,12 +655,10 @@ export default function VoiceGrid() {
                     <span className="sr-only">{p.name || p.identity} volume</span>
                     <Volume2 className="h-2.5 w-2.5" aria-hidden="true" />
                     <input
-                      type="range"
-                      min="0"
-                      max="100"
+                      type="range" min="0" max="100"
                       value={participantVolumes[p.identity] ?? DEFAULT_PARTICIPANT_VOLUME}
                       aria-label={`${p.name || p.identity} volume`}
-                      onChange={(event) => setParticipantVolume(p.identity, Number(event.target.value))}
+                      onChange={(e) => setParticipantVolume(p.identity, Number(e.target.value))}
                       className="w-16"
                     />
                   </label>
@@ -561,11 +675,9 @@ export default function VoiceGrid() {
               activeClass="bg-surface text-muted border-line hover:bg-surface-2"
               inactiveClass="bg-danger/10 text-danger border-danger/20"
               onClick={toggleMute}
-              title={
-                canPublish
-                  ? (isMuted ? t("voice.control.unmute") : t("voice.control.mute"))
-                  : t("voice.error.noStagePublish")
-              }
+              title={canPublish
+                ? (isMuted ? t("voice.control.unmute") : t("voice.control.mute"))
+                : t("voice.error.noStagePublish")}
               ariaPressed={isMuted}
               disabled={!canPublish || !isConnected}
             >
@@ -578,11 +690,9 @@ export default function VoiceGrid() {
               activeClass="bg-surface text-muted border-line hover:bg-surface-2"
               inactiveClass="bg-danger/10 text-danger border-danger/20"
               onClick={toggleCamera}
-              title={
-                canPublish
-                  ? (isCameraOn ? t("voice.control.cameraOff") : t("voice.control.cameraOn"))
-                  : t("voice.error.noStageCam")
-              }
+              title={canPublish
+                ? (isCameraOn ? t("voice.control.cameraOff") : t("voice.control.cameraOn"))
+                : t("voice.error.noStageCam")}
               ariaPressed={isCameraOn}
               disabled={!canPublish || !isConnected}
             >
@@ -611,36 +721,37 @@ export default function VoiceGrid() {
               </div>
             )}
 
-            {/* ── MEETING / LECTURE 전용 컨트롤 (GENERAL에서는 숨김) ── */}
+            {/* ── MEETING / LECTURE 전용 (GENERAL에서 완전 숨김) ── */}
             {isStructuredMode && (
               <>
                 <div className="h-5 w-px bg-surface-2" />
 
-                {/* Raise Hand — 본인이 host가 아닐 때 표시 */}
+                {/* Raise Hand — 비-호스트 전용 */}
                 {!isHost && (
                   <button
-                    onClick={() => {
-                      const nextState = !handRaised;
-                      setHandRaised(nextState);
-                      if (nextState && profile) {
-                        setFloorRequests((prev) => [...prev, { id: profile.id, name: profile.displayName || profile.username }]);
-                      } else if (profile) {
-                        setFloorRequests((prev) => prev.filter((r) => r.id !== profile.id));
-                      }
-                    }}
+                    onClick={handleRaiseHand}
                     title={t("voice.control.raiseHand")}
-                    className={`flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition active:scale-95 ${
+                    disabled={!isConnected}
+                    className={`flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition active:scale-95 disabled:opacity-40 ${
                       handRaised
                         ? "border-idle/50 bg-idle/20 text-idle shadow-md shadow-idle/20 animate-pulse"
-                        : "border-line bg-surface text-muted hover:bg-surface-2"
+                        : iAmGranted
+                          ? "border-online/50 bg-online/20 text-online"
+                          : "border-line bg-surface text-muted hover:bg-surface-2"
                     }`}
                   >
                     <Hand className="h-3.5 w-3.5" />
-                    <span>{handRaised ? t("voice.control.handRaised") : t("voice.control.raiseHand")}</span>
+                    <span>
+                      {iAmGranted
+                        ? t("voice.floor.granted")
+                        : handRaised
+                          ? t("voice.control.handRaised")
+                          : t("voice.control.raiseHand")}
+                    </span>
                   </button>
                 )}
 
-                {/* Speaker Requests Panel — host 전용 */}
+                {/* Speaker Requests — 호스트 전용 */}
                 {isHost && (
                   <div className="relative">
                     <button
@@ -651,44 +762,62 @@ export default function VoiceGrid() {
                       <Users className="h-3.5 w-3.5" />
                       <span>{t("voice.control.speakerRequests")}</span>
                       {floorRequests.length > 0 && (
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-idle text-[10px] font-bold text-slate-950">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-idle text-[10px] font-bold text-slate-950 animate-bounce">
                           {floorRequests.length}
                         </span>
                       )}
                     </button>
 
-                    {/* Floor Request Dropdown */}
+                    {/* Floor Panel Dropdown */}
                     {showFloorPanel && (
-                      <div className="absolute bottom-12 right-0 w-72 rounded-2xl border border-line bg-surface p-4 shadow-2xl backdrop-blur-2xl z-50 text-left">
+                      <div className="absolute bottom-12 right-0 w-80 rounded-2xl border border-line bg-surface p-4 shadow-2xl backdrop-blur-2xl z-50 text-left">
                         <div className="flex items-center justify-between border-b border-line pb-2 mb-3">
                           <span className="text-xs font-bold text-text flex items-center gap-1.5">
                             <Users className="h-3.5 w-3.5 text-purple-300" />
                             {t("voice.floor.title")}
+                            <span className="text-muted font-normal ml-1">
+                              — DataChannel 실시간 연동 ✅
+                            </span>
                           </span>
-                          <button onClick={() => setShowFloorPanel(false)} className="text-muted hover:text-text text-xs">✕</button>
+                          <button
+                            onClick={() => setShowFloorPanel(false)}
+                            className="text-muted hover:text-text text-xs"
+                          >✕</button>
                         </div>
 
                         {floorRequests.length === 0 ? (
                           <p className="py-4 text-center text-xs text-muted">{t("voice.floor.empty")}</p>
                         ) : (
-                          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                             {floorRequests.map((req) => {
-                              const isGranted = grantedSpeakers.includes(req.id);
+                              const isGranted = grantedSpeakers.includes(req.identity);
                               return (
-                                <div key={req.id} className="flex items-center justify-between rounded-xl bg-surface p-2.5 text-xs">
-                                  <span className="font-semibold text-text truncate max-w-[110px]">{req.name}</span>
-                                  <div className="flex gap-1">
+                                <div key={req.identity} className={`flex items-center justify-between rounded-xl p-2.5 text-xs border transition ${
+                                  isGranted
+                                    ? "bg-online/10 border-online/20"
+                                    : "bg-surface border-line"
+                                }`}>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-2 text-[10px] font-bold uppercase">
+                                      {req.name.substring(0, 2)}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="font-semibold text-text truncate max-w-[100px]">{req.name}</p>
+                                      <p className="text-[9px] text-muted truncate">{req.identity}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-1 shrink-0">
                                     {!isGranted ? (
                                       <button
-                                        onClick={() => setGrantedSpeakers((prev) => [...prev, req.id])}
-                                        className="rounded-lg bg-online px-2 py-1 text-[10px] font-bold text-on-accent hover:bg-online/90"
+                                        onClick={() => handleGrant(req.identity)}
+                                        className="rounded-lg bg-online px-2.5 py-1 text-[10px] font-bold text-on-accent hover:bg-online/90 transition"
                                       >
                                         {t("voice.floor.allow")}
                                       </button>
                                     ) : (
                                       <button
-                                        onClick={() => setGrantedSpeakers((prev) => prev.filter((i) => i !== req.id))}
-                                        className="rounded-lg bg-danger/30 text-danger border border-danger/30 px-2 py-1 text-[10px] font-bold hover:bg-danger hover:text-on-accent"
+                                        onClick={() => handleRevoke(req.identity)}
+                                        className="rounded-lg bg-danger/20 text-danger border border-danger/30 px-2.5 py-1 text-[10px] font-bold hover:bg-danger hover:text-on-accent transition"
                                       >
                                         {t("voice.floor.revoke")}
                                       </button>
@@ -699,6 +828,18 @@ export default function VoiceGrid() {
                             })}
                           </div>
                         )}
+
+                        {/* 일괄 회수 버튼 */}
+                        {grantedSpeakers.length > 0 && (
+                          <button
+                            onClick={() => {
+                              grantedSpeakers.forEach((id) => handleRevoke(id));
+                            }}
+                            className="mt-3 w-full rounded-xl border border-danger/20 bg-danger/10 px-3 py-1.5 text-[11px] font-semibold text-danger hover:bg-danger/20 transition"
+                          >
+                            발언 권한 전체 회수
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -706,7 +847,7 @@ export default function VoiceGrid() {
               </>
             )}
 
-            {/* Fullscreen Toggle — Lucide 아이콘으로 교체 (Issue #106) */}
+            {/* Fullscreen Toggle */}
             <button
               onClick={() => {
                 if (!document.fullscreenElement) {
@@ -720,10 +861,7 @@ export default function VoiceGrid() {
               title={isFullscreen ? t("voice.control.exitFullscreen") : t("voice.control.fullscreen")}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-muted hover:bg-surface-2 transition"
             >
-              {isFullscreen
-                ? <Minimize2 className="h-4 w-4" />
-                : <Maximize2 className="h-4 w-4" />
-              }
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </button>
 
             <div className="h-5 w-px bg-surface-2" />
@@ -742,6 +880,8 @@ export default function VoiceGrid() {
     </div>
   );
 }
+
+// ── Sub-components ───────────────────────────────────────────────────────────
 
 function ControlButton({
   children, onClick, title, active, activeClass, inactiveClass, ariaPressed, disabled,
@@ -768,21 +908,18 @@ function ControlButton({
   );
 }
 
+// ── Utilities ────────────────────────────────────────────────────────────────
+
 function getCanPublish(token: string | null): boolean {
   if (!token) return false;
-
   try {
-    const payloadPart = token.split(".")[1];
-    if (!payloadPart) return false;
-    const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-    const payload = JSON.parse(atob(padded)) as {
-      video?: { canPublish?: boolean };
-    };
+    const part = token.split(".")[1];
+    if (!part) return false;
+    const norm = part.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = norm.padEnd(Math.ceil(norm.length / 4) * 4, "=");
+    const payload = JSON.parse(atob(padded)) as { video?: { canPublish?: boolean } };
     return payload.video?.canPublish === true;
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
 function getErrorMessage(error: unknown): string {

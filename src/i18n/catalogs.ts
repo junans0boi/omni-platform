@@ -135,6 +135,11 @@ const en = {
   "voice.floor.allow": "Allow",
   "voice.floor.revoke": "Revoke",
   "voice.floor.me": "You",
+  "voice.floor.granted": "Speaking",
+  "voice.floor.grantedToast": "You have been granted the floor. Your mic is now on.",
+  "voice.floor.revokedToast": "Your speaking permission has been revoked.",
+  "voice.floor.requestSent": "Hand raised — waiting for host to allow.",
+  "voice.floor.cancelled": "Hand lowered.",
   // Settings
   "settings.tab.account": "Account",
   "settings.tab.notifications": "Notifications",
@@ -305,6 +310,11 @@ const ko: Catalog = {
   "voice.floor.allow": "발언 허용",
   "voice.floor.revoke": "회수",
   "voice.floor.me": "나",
+  "voice.floor.granted": "발언 중",
+  "voice.floor.grantedToast": "발언이 허용되었습니다. 마이크가 켜졌습니다.",
+  "voice.floor.revokedToast": "발언 권한이 회수되었습니다.",
+  "voice.floor.requestSent": "발언 신청됨 — 호스트의 허용을 기다리는 중.",
+  "voice.floor.cancelled": "손을 내렸습니다.",
   // Settings
   "settings.tab.account": "계정",
   "settings.tab.notifications": "알림",
