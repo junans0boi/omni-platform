@@ -107,9 +107,9 @@ export default function VoiceGrid() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // TICK-201, TICK-202: 실시간 AI 자막 State
+  // TICK-301, TICK-302: 실시간 AI 자막 롤링 State (최근 3개 화자 대화 롤링)
   const [showCaptions, setShowCaptions] = useState(true);
-  const [currentCaption, setCurrentCaption] = useState<{ speaker: string; text: string } | null>(null);
+  const [captionsList, setCaptionsList] = useState<{ id: string; speaker: string; text: string }[]>([]);
 
   // Issue #102: 발언권 — DataChannel 연동
   const [floorRequests, setFloorRequests] = useState<{ identity: string; name: string }[]>([]);
@@ -204,7 +204,11 @@ export default function VoiceGrid() {
         const transcriptText = event.results[lastIndex][0].transcript;
         if (transcriptText.trim()) {
           const speakerName = profile?.displayName || profile?.username || "나";
-          setCurrentCaption({ speaker: speakerName, text: transcriptText });
+          setCaptionsList((prev) => {
+            const newItem = { id: `cap_${Date.now()}_${Math.random()}`, speaker: speakerName, text: transcriptText };
+            const filtered = prev.filter((item) => item.speaker !== speakerName);
+            return [...filtered, newItem].slice(-3);
+          });
           publishFloor({
             type: "CAPTION_CHUNK",
             identity: profile?.id || "local",
@@ -327,12 +331,14 @@ export default function VoiceGrid() {
             }
             break;
 
-          // ─── TICK-201: 실시간 AI 자막 패킷 수신 ──────────────────────
+          // ─── TICK-301: 실시간 AI 자막 패킷 수신 ──────────────────────
           case "CAPTION_CHUNK":
             if (msg.captionText) {
-              setCurrentCaption({
-                speaker: msg.name || msg.identity,
-                text: msg.captionText,
+              const speakerName = msg.name || msg.identity;
+              setCaptionsList((prev) => {
+                const newItem = { id: `cap_${Date.now()}_${Math.random()}`, speaker: speakerName, text: msg.captionText! };
+                const filtered = prev.filter((item) => item.speaker !== speakerName);
+                return [...filtered, newItem].slice(-3);
               });
             }
             break;
@@ -721,13 +727,15 @@ export default function VoiceGrid() {
             })}
           </div>
 
-          {/* TICK-202: Live Captions Overlay Banner */}
-          {showCaptions && currentCaption && (
-            <div className="mx-3 mb-2 flex items-center justify-center">
-              <div className="flex items-center gap-2 rounded-xl border border-accent/30 bg-surface/90 px-4 py-1.5 shadow-lg backdrop-blur-md text-xs">
-                <span className="font-bold text-accent shrink-0">💬 @{currentCaption.speaker}:</span>
-                <span className="text-text font-medium animate-in fade-in duration-150">{currentCaption.text}</span>
-              </div>
+          {/* TICK-302: Live Captions Rolling List Overlay */}
+          {showCaptions && captionsList.length > 0 && (
+            <div className="mx-3 mb-2 flex flex-col items-center justify-center space-y-1.5 animate-in slide-in-from-bottom-2 duration-200">
+              {captionsList.map((cap) => (
+                <div key={cap.id} className="flex items-center gap-2 rounded-xl border border-accent/30 bg-surface/90 px-4 py-1.5 shadow-lg backdrop-blur-md text-xs max-w-xl">
+                  <span className="font-bold text-accent shrink-0">💬 @{cap.speaker}:</span>
+                  <span className="text-text font-medium truncate">{cap.text}</span>
+                </div>
+              ))}
             </div>
           )}
 
