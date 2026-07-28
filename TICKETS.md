@@ -21,13 +21,13 @@
   - `CAPTION_CHUNK` 메세지 타입 및 최근 2~3개 화자별 자막 롤링 리스트 state 구성 (`VoiceGrid.tsx`).
 - [x] **[TICK-302] [STT-UI] VoiceGrid 내 최근 화자 롤링 자막 바 & 자막 ON/OFF 토글 구축**
   - 화면 하단 오버레이 자막 바에 화자(@username) 및 자막 텍스트 롤링 시각화.
-- [ ] **[TICK-303] [STT-DB] 호스트 옵션 활성화 시 자막 회의록 DB 저장 파이프라인**
+- [x] **[TICK-303] [STT-DB] 호스트 옵션 활성화 시 자막 회의록 DB 저장 파이프라인**
   - 호스트 설정에 따른 자막 DB 누적 저장 API 연동.
 
 ### 📺 Feature 2: 웹캠 가상 배경 & 화면 공유 고화질 프리셋
-- [ ] **[TICK-304] [CAM-BG] Canvas 기반 비디오 배경 블러(Blur) & 프리셋 이미지 가공 필터**
+- [x] **[TICK-304] [CAM-BG] Canvas 기반 비디오 배경 블러(Blur) & 프리셋 이미지 가공 필터**
   - Canvas 2D processing 훅 작성 및 기본 4~5종 정적 이미지 배경 렌더링.
-- [ ] **[TICK-305] [SCREEN-PRESET] 화면 공유 720p/1080p60fps 자유 선택 & Dynacast 적응 연동**
+- [x] **[TICK-305] [SCREEN-PRESET] 화면 공유 720p/1080p60fps 자유 선택 & Dynacast 적응 연동**
   - SettingsModal 및 VoiceGrid 화면 공유 시 비트레이트 preset 및 Dynacast 연동.
 
 ### 📝 Feature 3: 음성 채널 회의록 PDF/MD 내보내기 & 요약 UI

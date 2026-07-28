@@ -1155,30 +1155,47 @@ export function SettingsModal({
                   />
                 </label>
 
-                {/* TICK-203: 가상 배경 필터 선택 (Virtual Backgrounds) */}
+                {/* TICK-304: 가상 배경 필터 선택 (Virtual Backgrounds - Option B) */}
                 <div className="pt-3 border-t border-line space-y-2">
-                  <span className="text-xs font-bold text-text block">웹캠 가상 배경 효과</span>
+                  <span className="text-xs font-bold text-text block">웹캠 가상 배경 효과 (Option B)</span>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => updatePreference({ cameraVirtualBg: "none" })}
-                      className="p-2.5 rounded-xl border border-accent bg-accent-soft text-text text-left text-xs font-bold"
+                      className="p-2.5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-muted text-left text-xs font-bold"
                     >
-                      <span>원본 (효과 없음)</span>
+                      <span>📷 원본 (효과 없음)</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => updatePreference({ cameraVirtualBg: "blur" })}
-                      className="p-2.5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-muted text-left text-xs font-bold"
+                      className="p-2.5 rounded-xl border border-accent bg-accent-soft text-text text-left text-xs font-bold"
                     >
                       <span>✨ 배경 블러 (Blur)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updatePreference({ cameraVirtualBg: "office" })}
+                      className="p-2.5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-muted text-left text-xs font-bold"
+                    >
+                      <span>🏢 모던 사무실</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updatePreference({ cameraVirtualBg: "cafe" })}
+                      className="p-2.5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-muted text-left text-xs font-bold"
+                    >
+                      <span>☕ 아늑한 카페</span>
                     </button>
                   </div>
                 </div>
 
-                {/* TICK-204: 화면 공유 고화질 프리셋 선택 */}
+                {/* TICK-305: 화면 공유 고화질 프리셋 선택 (Option A + C) */}
                 <div className="pt-3 border-t border-line space-y-2">
-                  <span className="text-xs font-bold text-text block">화면 공유 품질 프리셋</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-text block">화면 공유 품질 프리셋</span>
+                    <span className="text-[10px] text-online font-semibold">⚡ Dynacast 자동 적응</span>
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"

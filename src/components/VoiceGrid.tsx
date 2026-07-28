@@ -215,6 +215,15 @@ export default function VoiceGrid() {
             name: speakerName,
             captionText: transcriptText,
           });
+
+          // TICK-303: 호스트 자막 회의록 API 저장
+          if (activeVoiceChannelId) {
+            fetch(`/api/channels/${activeVoiceChannelId}/transcript`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ speaker: speakerName, text: transcriptText }),
+            }).catch(() => {});
+          }
         }
       };
 
