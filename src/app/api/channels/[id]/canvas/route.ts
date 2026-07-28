@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { messageBroker } from "@/lib/events";
 
 // Memory storage for canvas stroke data
 const canvasStore: Record<string, unknown> = {};
@@ -29,6 +30,13 @@ export async function POST(
   try {
     const body = await req.json();
     canvasStore[channelId] = body.data;
+
+    // TICK-310: Realtime SSE event trigger for CANVAS co-drawing
+    messageBroker.emit(`channel:${channelId}`, {
+      type: "canvas:updated",
+      channelId,
+      data: canvasStore[channelId],
+    });
 
     return NextResponse.json({ success: true });
   } catch {
