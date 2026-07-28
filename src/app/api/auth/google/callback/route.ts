@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSession } from "@/lib/session";
+import { getPublicOrigin } from "@/lib/request-origin";
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -20,13 +21,14 @@ interface GoogleUserInfo {
 }
 
 export async function GET(req: NextRequest) {
+  const origin = getPublicOrigin(req);
   const requestUrl = new URL(req.url);
   const code = requestUrl.searchParams.get("code");
   const error = requestUrl.searchParams.get("error");
 
   if (error || !code) {
     console.error("Google OAuth callback error:", error);
-    return NextResponse.redirect(new URL("/login?error=google_auth_cancelled", requestUrl.origin));
+    return NextResponse.redirect(new URL("/login?error=google_auth_cancelled", origin));
   }
 
   try {
@@ -35,10 +37,10 @@ export async function GET(req: NextRequest) {
 
     if (!clientId || !clientSecret) {
       console.error("GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing");
-      return NextResponse.redirect(new URL("/login?error=google_auth_not_configured", requestUrl.origin));
+      return NextResponse.redirect(new URL("/login?error=google_auth_not_configured", origin));
     }
 
-    const redirectUri = `${requestUrl.origin}/api/auth/google/callback`;
+    const redirectUri = `${origin}/api/auth/google/callback`;
 
     // 1. Exchange authorization code for tokens
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -56,7 +58,7 @@ export async function GET(req: NextRequest) {
     if (!tokenRes.ok) {
       const tokenErr = await tokenRes.text();
       console.error("Failed to exchange Google token:", tokenErr);
-      return NextResponse.redirect(new URL("/login?error=google_token_failed", requestUrl.origin));
+      return NextResponse.redirect(new URL("/login?error=google_token_failed", origin));
     }
 
     const tokenData = (await tokenRes.json()) as GoogleTokenResponse;
@@ -68,13 +70,13 @@ export async function GET(req: NextRequest) {
 
     if (!userRes.ok) {
       console.error("Failed to fetch Google user info");
-      return NextResponse.redirect(new URL("/login?error=google_userinfo_failed", requestUrl.origin));
+      return NextResponse.redirect(new URL("/login?error=google_userinfo_failed", origin));
     }
 
     const googleUser = (await userRes.json()) as GoogleUserInfo;
 
     if (!googleUser.email) {
-      return NextResponse.redirect(new URL("/login?error=google_email_missing", requestUrl.origin));
+      return NextResponse.redirect(new URL("/login?error=google_email_missing", origin));
     }
 
     const email = googleUser.email.toLowerCase().trim();
@@ -128,9 +130,9 @@ export async function GET(req: NextRequest) {
     // 4. Create custom session cookie and redirect to dashboard
     await createSession(profile.id);
 
-    return NextResponse.redirect(new URL("/dashboard", requestUrl.origin));
+    return NextResponse.redirect(new URL("/dashboard", origin));
   } catch (err) {
     console.error("Unhandled error in Google callback:", err);
-    return NextResponse.redirect(new URL("/login?error=unexpected", requestUrl.origin));
+    return NextResponse.redirect(new URL("/login?error=unexpected", origin));
   }
 }

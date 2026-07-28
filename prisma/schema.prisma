@@ -181,6 +181,7 @@ model Message {
   threadReplies Message[]  @relation("ThreadReplies")
   reactions     Reaction[]
   mentions      Mention[]
+  isPinned      Boolean    @default(false)
 
   @@index([channelId, threadRootId, createdAt, id])
   @@index([replyToId])
