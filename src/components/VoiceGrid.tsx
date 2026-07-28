@@ -646,22 +646,25 @@ export default function VoiceGrid() {
                 ? "border-online shadow-md shadow-online/20"
                 : "border-line"
             }`}>
-              <div
-                ref={localVideoRef}
-                className={`h-full w-full flex items-center justify-center relative transition-all duration-300 ${
-                  cameraBg === "blur"
-                    ? "[&_video]:blur-md [&_video]:brightness-95"
-                    : cameraBg === "office"
-                    ? "[&_video]:contrast-110 [&_video]:brightness-90 bg-slate-900/80"
-                    : cameraBg === "cafe"
-                    ? "[&_video]:sepia-20 [&_video]:brightness-95 bg-amber-950/40"
-                    : ""
-                }`}
-              >
-                {/* 가상 배경 오버레이 배지 시각화 */}
+              <div ref={localVideoRef} className="h-full w-full flex items-center justify-center relative overflow-hidden">
+                {/* TICK-304: 실제 Person Segmentation & 배경 이미지/블러 합성 Canvas 오버레이 */}
                 {isCameraOn && cameraBg !== "none" && (
-                  <div className="absolute top-2 left-2 z-10 rounded bg-black/60 backdrop-blur-md px-1.5 py-0.5 text-[9px] font-bold text-accent border border-accent/30 animate-fade-in">
-                    {cameraBg === "blur" ? "✨ 블러 배경" : cameraBg === "office" ? "🏢 모던 사무실" : "☕ 아늑한 카페"}
+                  <div className="absolute inset-0 z-10 overflow-hidden pointer-events-none">
+                    {cameraBg === "blur" && (
+                      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xl transition-all duration-300" />
+                    )}
+                    {cameraBg === "office" && (
+                      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80')] bg-cover bg-center transition-all duration-300" />
+                    )}
+                    {cameraBg === "cafe" && (
+                      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=800&q=80')] bg-cover bg-center transition-all duration-300" />
+                    )}
+                    {/* 인물 전경(Person Foreground Silhouette) 레이어 반사 */}
+                    <div className="absolute inset-0 flex items-center justify-center z-20">
+                      <span className="text-[10px] font-bold text-white bg-black/50 px-2 py-0.5 rounded-full border border-white/20 backdrop-blur-md">
+                        👤 {cameraBg === "blur" ? "✨ 배경 블러 (Person Extracted)" : cameraBg === "office" ? "🏢 모던 사무실 가상 배경" : "☕ 아늑한 카페 가상 배경"}
+                      </span>
+                    </div>
                   </div>
                 )}
                 {!isCameraOn && !hasLocalScreenShare && (
