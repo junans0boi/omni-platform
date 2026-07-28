@@ -111,6 +111,12 @@ export default function VoiceGrid() {
   const [showCaptions, setShowCaptions] = useState(true);
   const [captionsList, setCaptionsList] = useState<{ id: string; speaker: string; text: string }[]>([]);
 
+  // 디스코드 스타일 카메라/화면공유 드롭다운 메뉴 팝오버
+  const [showCameraMenu, setShowCameraMenu] = useState(false);
+  const [showScreenMenu, setShowScreenMenu] = useState(false);
+  const [cameraBg, setCameraBg] = useState<"none" | "blur" | "office" | "cafe">("none");
+  const [screenPreset, setScreenPreset] = useState<"720p" | "1080p60">("1080p60");
+
   // Issue #102: 발언권 — DataChannel 연동
   const [floorRequests, setFloorRequests] = useState<{ identity: string; name: string }[]>([]);
   const [grantedSpeakers, setGrantedSpeakers] = useState<string[]>([]);
@@ -765,33 +771,139 @@ export default function VoiceGrid() {
               {isEffectivelyMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
             </ControlButton>
 
-            {/* Camera */}
-            <ControlButton
-              active={isCameraOn}
-              activeClass="bg-surface text-muted border-line hover:bg-surface-2"
-              inactiveClass="bg-danger/10 text-danger border-danger/20"
-              onClick={toggleCamera}
-              title={canPublish
-                ? (isCameraOn ? t("voice.control.cameraOff") : t("voice.control.cameraOn"))
-                : t("voice.error.noStageCam")}
-              ariaPressed={isCameraOn}
-              disabled={!canPublish || !isConnected}
-            >
-              {isCameraOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
-            </ControlButton>
+            {/* Camera with Discord-style Dropdown Menu (> / Chevron) */}
+            <div className="relative flex items-center">
+              <ControlButton
+                active={isCameraOn}
+                activeClass="bg-surface text-muted border-line hover:bg-surface-2"
+                inactiveClass="bg-danger/10 text-danger border-danger/20"
+                onClick={toggleCamera}
+                title={canPublish
+                  ? (isCameraOn ? t("voice.control.cameraOff") : t("voice.control.cameraOn"))
+                  : t("voice.error.noStageCam")}
+                ariaPressed={isCameraOn}
+                disabled={!canPublish || !isConnected}
+              >
+                {isCameraOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+              </ControlButton>
 
-            {/* Screen share */}
-            <ControlButton
-              active={isScreenSharing}
-              activeClass="bg-online/10 text-online border-online/20"
-              inactiveClass="bg-surface text-muted border-line hover:bg-surface-2"
-              onClick={toggleScreenShare}
-              title={canPublish ? t("voice.control.shareScreen") : t("voice.error.noStageScreen")}
-              ariaPressed={isScreenSharing}
-              disabled={!canPublish || !isConnected}
-            >
-              <Monitor className="h-4 w-4" />
-            </ControlButton>
+              {/* 디스코드 스타일 카메라 옵션 화살표(>) 버튼 */}
+              <button
+                onClick={() => { setShowCameraMenu(!showCameraMenu); setShowScreenMenu(false); }}
+                title="웹캠 가상 배경 & 카메라 설정"
+                className="flex h-9 w-4 items-center justify-center rounded-r-full text-muted hover:text-text hover:bg-surface-2 -ml-2 border-y border-r border-line text-[10px] transition"
+              >
+                <ChevronDown className="h-3 w-3" />
+              </button>
+
+              {/* 카메라 가상 배경 선택 팝오버 (Discord Virtual Backgrounds) */}
+              {showCameraMenu && (
+                <div className="absolute bottom-12 left-0 w-64 rounded-2xl border border-line bg-surface p-3 shadow-2xl backdrop-blur-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex items-center justify-between border-b border-line pb-2 mb-2">
+                    <span className="text-xs font-bold text-text flex items-center gap-1.5">
+                      <Video className="h-3.5 w-3.5 text-accent" />
+                      웹캠 가상 배경 설정
+                    </span>
+                    <button onClick={() => setShowCameraMenu(false)} className="text-muted hover:text-text text-xs">✕</button>
+                  </div>
+                  <div className="space-y-1.5 text-xs">
+                    <button
+                      onClick={() => { setCameraBg("none"); setShowCameraMenu(false); }}
+                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left font-semibold transition ${
+                        cameraBg === "none" ? "bg-accent/20 text-accent border border-accent/30" : "hover:bg-surface-2 text-text"
+                      }`}
+                    >
+                      <span>📷 원본 (효과 없음)</span>
+                      {cameraBg === "none" && <span>✓</span>}
+                    </button>
+                    <button
+                      onClick={() => { setCameraBg("blur"); setShowCameraMenu(false); }}
+                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left font-semibold transition ${
+                        cameraBg === "blur" ? "bg-accent/20 text-accent border border-accent/30" : "hover:bg-surface-2 text-text"
+                      }`}
+                    >
+                      <span>✨ 배경 블러 (Blur)</span>
+                      {cameraBg === "blur" && <span>✓</span>}
+                    </button>
+                    <button
+                      onClick={() => { setCameraBg("office"); setShowCameraMenu(false); }}
+                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left font-semibold transition ${
+                        cameraBg === "office" ? "bg-accent/20 text-accent border border-accent/30" : "hover:bg-surface-2 text-text"
+                      }`}
+                    >
+                      <span>🏢 모던 사무실</span>
+                      {cameraBg === "office" && <span>✓</span>}
+                    </button>
+                    <button
+                      onClick={() => { setCameraBg("cafe"); setShowCameraMenu(false); }}
+                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left font-semibold transition ${
+                        cameraBg === "cafe" ? "bg-accent/20 text-accent border border-accent/30" : "hover:bg-surface-2 text-text"
+                      }`}
+                    >
+                      <span>☕ 아늑한 카페</span>
+                      {cameraBg === "cafe" && <span>✓</span>}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Screen share with Dropdown Menu (> / Chevron) */}
+            <div className="relative flex items-center">
+              <ControlButton
+                active={isScreenSharing}
+                activeClass="bg-online/10 text-online border-online/20"
+                inactiveClass="bg-surface text-muted border-line hover:bg-surface-2"
+                onClick={toggleScreenShare}
+                title={canPublish ? t("voice.control.shareScreen") : t("voice.error.noStageScreen")}
+                ariaPressed={isScreenSharing}
+                disabled={!canPublish || !isConnected}
+              >
+                <Monitor className="h-4 w-4" />
+              </ControlButton>
+
+              {/* 디스코드 스타일 화면 공유 옵션 화살표(>) 버튼 */}
+              <button
+                onClick={() => { setShowScreenMenu(!showScreenMenu); setShowCameraMenu(false); }}
+                title="화면 공유 화질 설정"
+                className="flex h-9 w-4 items-center justify-center rounded-r-full text-muted hover:text-text hover:bg-surface-2 -ml-2 border-y border-r border-line text-[10px] transition"
+              >
+                <ChevronDown className="h-3 w-3" />
+              </button>
+
+              {/* 화면 공유 화질 선택 팝오버 */}
+              {showScreenMenu && (
+                <div className="absolute bottom-12 left-0 w-60 rounded-2xl border border-line bg-surface p-3 shadow-2xl backdrop-blur-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex items-center justify-between border-b border-line pb-2 mb-2">
+                    <span className="text-xs font-bold text-text flex items-center gap-1.5">
+                      <Monitor className="h-3.5 w-3.5 text-online" />
+                      화면 공유 화질 선택
+                    </span>
+                    <button onClick={() => setShowScreenMenu(false)} className="text-muted hover:text-text text-xs">✕</button>
+                  </div>
+                  <div className="space-y-1.5 text-xs">
+                    <button
+                      onClick={() => { setScreenPreset("720p"); setShowScreenMenu(false); }}
+                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left font-semibold transition ${
+                        screenPreset === "720p" ? "bg-online/20 text-online border border-online/30" : "hover:bg-surface-2 text-text"
+                      }`}
+                    >
+                      <span>HD (720p 30fps)</span>
+                      {screenPreset === "720p" && <span>✓</span>}
+                    </button>
+                    <button
+                      onClick={() => { setScreenPreset("1080p60"); setShowScreenMenu(false); }}
+                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left font-semibold transition ${
+                        screenPreset === "1080p60" ? "bg-online/20 text-online border border-online/30" : "hover:bg-surface-2 text-text"
+                      }`}
+                    >
+                      <span>FHD (1080p 60fps) 🔥</span>
+                      {screenPreset === "1080p60" && <span>✓</span>}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* TICK-202: Live Captions Toggle Button */}
             <ControlButton
