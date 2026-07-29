@@ -99,8 +99,6 @@ export function SettingsModal({
   const [isTestingVideo, setIsTestingVideo] = useState<boolean>(false);
   const [alwaysPreviewVideo, setAlwaysPreviewVideo] = useState<boolean>(true);
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
-  const [cameraVirtualBgLocal, setCameraVirtualBgLocal] = useState<"none" | "blur" | "office" | "cafe">("none");
-  const [screenPresetLocal, setScreenPresetLocal] = useState<"720p" | "1080p60">("1080p60");
 
   // Language & Time State
   const [timeFormat, setTimeFormat] = useState<"auto" | "12h" | "24h">("auto");
@@ -1157,88 +1155,8 @@ export function SettingsModal({
                   />
                 </label>
 
-                {/* TICK-304: 가상 배경 필터 선택 (Virtual Backgrounds - Option B) */}
-                <div className="pt-3 border-t border-line space-y-2">
-                  <span className="text-xs font-bold text-text block">웹캠 가상 배경 효과 (Option B)</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => { setCameraVirtualBgLocal("none"); updatePreference({ cameraVirtualBg: "none" }); }}
-                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition ${
-                        cameraVirtualBgLocal === "none"
-                          ? "border-accent bg-accent-soft text-text shadow-sm"
-                          : "border-line bg-surface hover:bg-surface-2 text-muted"
-                      }`}
-                    >
-                      <span>📷 원본 (효과 없음)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setCameraVirtualBgLocal("blur"); updatePreference({ cameraVirtualBg: "blur" }); }}
-                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition ${
-                        cameraVirtualBgLocal === "blur"
-                          ? "border-accent bg-accent-soft text-text shadow-sm"
-                          : "border-line bg-surface hover:bg-surface-2 text-muted"
-                      }`}
-                    >
-                      <span>✨ 배경 블러 (Blur)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setCameraVirtualBgLocal("office"); updatePreference({ cameraVirtualBg: "office" }); }}
-                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition ${
-                        cameraVirtualBgLocal === "office"
-                          ? "border-accent bg-accent-soft text-text shadow-sm"
-                          : "border-line bg-surface hover:bg-surface-2 text-muted"
-                      }`}
-                    >
-                      <span>🏢 모던 사무실</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setCameraVirtualBgLocal("cafe"); updatePreference({ cameraVirtualBg: "cafe" }); }}
-                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition ${
-                        cameraVirtualBgLocal === "cafe"
-                          ? "border-accent bg-accent-soft text-text shadow-sm"
-                          : "border-line bg-surface hover:bg-surface-2 text-muted"
-                      }`}
-                    >
-                      <span>☕ 아늑한 카페</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* TICK-305: 화면 공유 고화질 프리셋 선택 (Option A + C) */}
-                <div className="pt-3 border-t border-line space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-text block">화면 공유 품질 프리셋</span>
-                    <span className="text-[10px] text-online font-semibold">⚡ Dynacast 자동 적응</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => { setScreenPresetLocal("720p"); updatePreference({ screenPreset: "720p" }); }}
-                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition ${
-                        screenPresetLocal === "720p"
-                          ? "border-accent bg-accent-soft text-text shadow-sm"
-                          : "border-line bg-surface hover:bg-surface-2 text-muted"
-                      }`}
-                    >
-                      <span>HD (720p 30fps)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setScreenPresetLocal("1080p60"); updatePreference({ screenPreset: "1080p60" }); }}
-                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition ${
-                        screenPresetLocal === "1080p60"
-                          ? "border-accent bg-accent-soft text-text shadow-sm"
-                          : "border-line bg-surface hover:bg-surface-2 text-muted"
-                      }`}
-                    >
-                      <span>FHD (1080p 60fps) 🔥</span>
-                    </button>
-                  </div>
-                </div>
+                {/* 웹캠 가상 배경 & 화면 공유 화질은 음성 채널 하단 카메라/화면공유 버튼의
+                    드롭다운(∨)에서 실시간으로 설정합니다. */}
 
                 {/* 카메라 선택 */}
                 <div>

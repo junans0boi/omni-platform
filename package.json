@@ -17,6 +17,7 @@
     "test:ci": "npm run test:policy && npm run typecheck && npm run lint && npm run test:unit && npm run test:e2e && npm run build"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^1.0.0",
     "@prisma/client": "^5.22.0",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.109.0",

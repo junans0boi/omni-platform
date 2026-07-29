@@ -24,6 +24,7 @@ import {
   Hand, Users, Captions,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
+import { VirtualBackgroundProcessor, type VirtualBackgroundMode } from "@/lib/virtual-background";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Issue #102 & TICK-201: DataChannel 발언권 및 실시간 자막 메시지 프로토콜
@@ -114,7 +115,7 @@ export default function VoiceGrid() {
   // 디스코드 스타일 카메라/화면공유 드롭다운 메뉴 팝오버
   const [showCameraMenu, setShowCameraMenu] = useState(false);
   const [showScreenMenu, setShowScreenMenu] = useState(false);
-  const [cameraBg, setCameraBg] = useState<"none" | "blur" | "office" | "cafe">("none");
+  const [cameraBg, setCameraBg] = useState<"none" | VirtualBackgroundMode>("none");
   const [screenPreset, setScreenPreset] = useState<"720p" | "1080p60">("1080p60");
 
   // Issue #102: 발언권 — DataChannel 연동
@@ -144,6 +145,9 @@ export default function VoiceGrid() {
   const roomRef = useRef<Room | null>(null);
   const muteInitializedRef = useRef(false);
   const localVideoRef = useRef<HTMLDivElement>(null);
+  // TICK-304: 실제 MediaPipe Person Segmentation 기반 가상 배경 처리기
+  const bgProcessorRef = useRef<VirtualBackgroundProcessor | null>(null);
+  const originalCameraTrackRef = useRef<MediaStreamTrack | null>(null);
   const remoteVideoRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const canPublish = getCanPublish(livekitToken);
   const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "";
@@ -388,6 +392,9 @@ export default function VoiceGrid() {
       room.disconnect();
       roomRef.current = null;
       muteInitializedRef.current = false;
+      bgProcessorRef.current?.stop();
+      bgProcessorRef.current = null;
+      originalCameraTrackRef.current = null;
     };
   }, [livekitToken, activeVoiceChannelId, wsUrl]);
 
@@ -412,7 +419,69 @@ export default function VoiceGrid() {
       .catch((e) => console.warn("Camera toggle error:", e.message));
   }, [canPublish, connectionState, isCameraOn]);
 
+  // ── 카메라 꺼짐 시 가상 배경 처리기 정리 ─────────────────────────────────
+  useEffect(() => {
+    if (isCameraOn) return;
+    bgProcessorRef.current?.stop();
+    bgProcessorRef.current = null;
+    originalCameraTrackRef.current = null;
+  }, [isCameraOn]);
+
+  // ── 가상 배경 / 블러: MediaPipe Selfie Segmentation + Canvas 합성 ─────────
+  // 실제로 사람과 배경을 분리해 canvas에 합성한 뒤, 그 canvas의 MediaStreamTrack을
+  // 카메라 트랙 자리에 replaceTrack으로 꽂아넣어 상대방에게도 동일하게 전송된다.
+  useEffect(() => {
+    const room = roomRef.current;
+    if (!room || connectionState !== ConnectionState.Connected || !canPublish || !isCameraOn) return;
+
+    let cancelled = false;
+
+    const apply = async () => {
+      const pub = room.localParticipant.getTrackPublication(Track.Source.Camera);
+      const videoTrack = pub?.track;
+      if (!videoTrack || videoTrack.kind !== Track.Kind.Video) return;
+
+      if (!originalCameraTrackRef.current) {
+        originalCameraTrackRef.current = videoTrack.mediaStreamTrack;
+      }
+
+      if (cameraBg === "none") {
+        const activeProcessor = bgProcessorRef.current;
+        if (activeProcessor) {
+          const original = originalCameraTrackRef.current;
+          bgProcessorRef.current = null;
+          if (original && original.readyState === "live") {
+            await videoTrack.replaceTrack(original).catch((e) =>
+              console.warn("Camera bg restore error:", e.message)
+            );
+          }
+          activeProcessor.stop();
+        }
+        return;
+      }
+
+      const sourceTrack = originalCameraTrackRef.current;
+      if (!sourceTrack || sourceTrack.readyState !== "live") return;
+
+      try {
+        const processor = await VirtualBackgroundProcessor.create(sourceTrack, cameraBg);
+        if (cancelled) { processor.stop(); return; }
+        const prev = bgProcessorRef.current;
+        bgProcessorRef.current = processor;
+        await videoTrack.replaceTrack(processor.outputTrack);
+        prev?.stop();
+      } catch (e) {
+        console.warn("Virtual background init error:", e);
+      }
+    };
+
+    apply();
+
+    return () => { cancelled = true; };
+  }, [canPublish, connectionState, isCameraOn, cameraBg, localMedia.revision]);
+
   // ── Screen share toggle ───────────────────────────────────────────────────
+  const screenPresetRef = useRef(screenPreset);
   useEffect(() => {
     const room = roomRef.current;
     if (!room || connectionState !== ConnectionState.Connected || !canPublish) return;
@@ -420,11 +489,29 @@ export default function VoiceGrid() {
       ? { resolution: { width: 1920, height: 1080, frameRate: 60 }, audio: true }
       : { resolution: { width: 1280, height: 720, frameRate: 30 }, audio: true };
 
-    room.localParticipant.setScreenShareEnabled(isScreenSharing, screenCaptureOptions).then(() => {
-      if (screenShareInitRef.current)
-        getSoundEffects()?.emit(isScreenSharing ? "SCREEN_SHARE_STARTED" : "SCREEN_SHARE_STOPPED");
-      screenShareInitRef.current = true;
-    }).catch((e) => console.warn("Screen share error:", e.message));
+    const presetChangedWhileSharing =
+      isScreenSharing && screenShareInitRef.current && screenPresetRef.current !== screenPreset;
+    screenPresetRef.current = screenPreset;
+
+    const run = async () => {
+      try {
+        if (presetChangedWhileSharing) {
+          // LiveKit의 setScreenShareEnabled(true, ...)는 이미 공유 중인 publication에는
+          // unmute()만 호출하고 새 resolution/frameRate 옵션을 무시하므로, 프리셋을
+          // 실제로 반영하려면 껐다가 새 옵션으로 다시 켜서 트랙을 재캡처해야 한다.
+          await room.localParticipant.setScreenShareEnabled(false);
+          await room.localParticipant.setScreenShareEnabled(true, screenCaptureOptions);
+        } else {
+          await room.localParticipant.setScreenShareEnabled(isScreenSharing, screenCaptureOptions);
+        }
+        if (screenShareInitRef.current)
+          getSoundEffects()?.emit(isScreenSharing ? "SCREEN_SHARE_STARTED" : "SCREEN_SHARE_STOPPED");
+        screenShareInitRef.current = true;
+      } catch (e) {
+        console.warn("Screen share error:", (e as Error).message);
+      }
+    };
+    run();
   }, [canPublish, connectionState, isScreenSharing, screenPreset]);
 
   // ── Attach local video track ──────────────────────────────────────────────
@@ -647,24 +734,12 @@ export default function VoiceGrid() {
                 : "border-line"
             }`}>
               <div ref={localVideoRef} className="h-full w-full flex items-center justify-center relative overflow-hidden">
-                {/* TICK-304: 실제 Person Segmentation & 배경 이미지/블러 합성 Canvas 오버레이 */}
+                {/* 실제 비디오는 MediaPipe Person Segmentation으로 합성된 canvas 트랙이 attach됨 (아래 "Attach local video track" effect) */}
                 {isCameraOn && cameraBg !== "none" && (
-                  <div className="absolute inset-0 z-10 overflow-hidden pointer-events-none">
-                    {cameraBg === "blur" && (
-                      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xl transition-all duration-300" />
-                    )}
-                    {cameraBg === "office" && (
-                      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80')] bg-cover bg-center transition-all duration-300" />
-                    )}
-                    {cameraBg === "cafe" && (
-                      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=800&q=80')] bg-cover bg-center transition-all duration-300" />
-                    )}
-                    {/* 인물 전경(Person Foreground Silhouette) 레이어 반사 */}
-                    <div className="absolute inset-0 flex items-center justify-center z-20">
-                      <span className="text-[10px] font-bold text-white bg-black/50 px-2 py-0.5 rounded-full border border-white/20 backdrop-blur-md">
-                        👤 {cameraBg === "blur" ? "✨ 배경 블러 (Person Extracted)" : cameraBg === "office" ? "🏢 모던 사무실 가상 배경" : "☕ 아늑한 카페 가상 배경"}
-                      </span>
-                    </div>
+                  <div className="absolute top-1.5 right-1.5 z-20 pointer-events-none">
+                    <span className="text-[9px] font-bold text-white bg-black/50 px-2 py-0.5 rounded-full border border-white/20 backdrop-blur-md">
+                      {cameraBg === "blur" ? "✨ 배경 블러" : cameraBg === "office" ? "🏢 모던 사무실" : "☕ 아늑한 카페"}
+                    </span>
                   </div>
                 )}
                 {!isCameraOn && !hasLocalScreenShare && (
