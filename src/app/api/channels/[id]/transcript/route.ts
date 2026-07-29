@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-
-// Memory & session transcripts store
-const transcriptStore: Record<string, { speaker: string; text: string; timestamp: string }[]> = {};
+import { prisma } from "@/lib/prisma";
 
 export async function GET(
   req: NextRequest,
@@ -12,9 +10,13 @@ export async function GET(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id: channelId } = await params;
-  const list = transcriptStore[channelId] || [];
 
-  return NextResponse.json({ transcripts: list });
+  const transcripts = await prisma.transcriptEntry.findMany({
+    where: { channelId },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return NextResponse.json({ transcripts });
 }
 
 export async function POST(
@@ -28,21 +30,18 @@ export async function POST(
 
   try {
     const body = await req.json();
-    const { speaker, text } = body;
+    const speaker = typeof body.speaker === "string" ? body.speaker.trim() : "";
+    const text = typeof body.text === "string" ? body.text.trim() : "";
 
-    if (!transcriptStore[channelId]) {
-      transcriptStore[channelId] = [];
+    if (!text) {
+      return NextResponse.json({ error: "text is required" }, { status: 400 });
     }
 
-    if (text && text.trim()) {
-      transcriptStore[channelId].push({
-        speaker: speaker || "Unknown",
-        text: text.trim(),
-        timestamp: new Date().toISOString(),
-      });
-    }
+    const entry = await prisma.transcriptEntry.create({
+      data: { channelId, speakerName: speaker || "Unknown", text },
+    });
 
-    return NextResponse.json({ success: true, count: transcriptStore[channelId].length });
+    return NextResponse.json({ success: true, entry });
   } catch {
     return NextResponse.json({ error: "Failed to store transcript" }, { status: 500 });
   }

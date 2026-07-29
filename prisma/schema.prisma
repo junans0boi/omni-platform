@@ -88,6 +88,30 @@ model Channel {
   createdAt  DateTime          @default(now())
   messages   Message[]
   overrides  ChannelOverride[]
+  transcriptEntries TranscriptEntry[]
+  meetingSummaries  MeetingSummary[]
+}
+
+model TranscriptEntry {
+  id          String   @id @default(uuid())
+  channelId   String
+  channel     Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  speakerName String
+  text        String
+  createdAt   DateTime @default(now())
+
+  @@index([channelId, createdAt])
+}
+
+model MeetingSummary {
+  id          String   @id @default(uuid())
+  channelId   String
+  channel     Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  title       String
+  summaryText String
+  createdAt   DateTime @default(now())
+
+  @@index([channelId, createdAt])
 }
 
 model ChannelOverride {

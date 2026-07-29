@@ -27,6 +27,7 @@ export function ChannelHeaderExtras({
   const [serverPinnedMessages, setServerPinnedMessages] = useState<Message[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [summaries, setSummaries] = useState<any[]>([]);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   // Fetch summary history from API
   const fetchSummaries = useCallback(async () => {
@@ -78,16 +79,23 @@ export function ChannelHeaderExtras({
   const handleGenerateSummary = async () => {
     if (!channelId) return;
     setGeneratingSummary(true);
+    setSummaryError(null);
     try {
-      const res = await fetch(`/api/channels/${channelId}/summary`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript: "세션 자막 요약 요청" }),
-      });
+      const res = await fetch(`/api/channels/${channelId}/summary`, { method: "POST" });
       if (res.ok) {
-        await fetchSummaries();
+        const data = await res.json();
+        if (data.reason === "no_transcript") {
+          setSummaryError("아직 쌓인 대화 자막이 없습니다. 통화 중 자막이 인식된 뒤에 다시 시도해 주세요.");
+        } else {
+          await fetchSummaries();
+        }
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setSummaryError(data.error || "요약 생성에 실패했습니다.");
       }
-    } catch {}
+    } catch {
+      setSummaryError("요약 생성에 실패했습니다.");
+    }
     setGeneratingSummary(false);
   };
 
@@ -257,6 +265,12 @@ export function ChannelHeaderExtras({
                 <FileText className="h-3.5 w-3.5" />
                 <span>{generatingSummary ? "AI 요약 생성 중..." : "✨ AI 회의록 즉시 생성"}</span>
               </button>
+
+              {summaryError && (
+                <div className="rounded-xl border border-danger/30 bg-danger/10 p-2.5 text-[11px] text-danger">
+                  {summaryError}
+                </div>
+              )}
 
               {summaries.length === 0 ? (
                 <div className="py-6 text-center text-xs text-muted">

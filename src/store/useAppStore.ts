@@ -564,6 +564,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   leaveVoiceChannel: () => {
+    const channelId = get().activeVoiceChannelId;
     set({
       activeVoiceChannelId: null,
       livekitToken: null,
@@ -571,6 +572,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       isCameraOn: false,
       isScreenSharing: false,
     });
+    // 통화 종료 시 지금까지 쌓인 자막을 자동으로 AI 요약한다 (대화가 없으면 서버가 조용히 스킵).
+    if (channelId) {
+      fetch(`/api/channels/${channelId}/summary`, { method: "POST" }).catch((e) =>
+        console.error("Auto meeting summary failed:", e)
+      );
+    }
   },
 
   toggleMute: () => set((state) => ({ isMuted: !state.isMuted })),
