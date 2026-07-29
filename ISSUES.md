@@ -123,8 +123,8 @@ graph TD
 - **설명**: SSE 연결 단락 시 3-5초 간격 백그라운드 폴링 자동 전환 및 채팅 메시지 실시간 렌더링 안정성 보강.
 
 #### **Issue #64: [VOICE-STT-1] FEAT-VOICE_STT_SUMMARY: 음성 채널 백그라운드 STT 파싱, 멀티 AI 요약 및 회의록 DB/히스토리 탭**
-- **상태**: ✅ 완료 (Resolved)
-- **설명**: 음성/수업 채널 백그라운드 STT 실시간 텍스트 파싱, Gemini 2.5 Flash / Groq 멀티 AI 요약 연동 및 회의록 DB 저장 및 히스토리 탭/다운로드 구현.
+- **상태**: ✅ 완료 (Resolved) — 2026-07-29 재검증
+- **설명**: 음성/수업 채널 백그라운드 STT 실시간 텍스트 파싱 및 회의록 히스토리 UI. ⚠️ 최초 "완료" 표시 당시 요약 API는 하드코딩된 mock 텍스트를 반환하고 자막은 서버 메모리(in-memory, 재시작 시 소실, PM2 클러스터 워커 간 불일치)에만 저장되는 가짜 구현이었음 — 2026-07-29에 Issue #107에서 실제 DB+Groq AI 연동으로 재구현하며 진짜로 완료됨.
 
 #### **Issue #67: [AUTH-GOOGLE-1] 자체 백엔드(Prisma) 연동 Google OAuth 2.0 로그인 기능 추가**
 - **상태**: ✅ 완료 (Resolved)
@@ -161,3 +161,47 @@ graph TD
 #### **Issue #106: [UI-1] 음성채널 전체화면 버튼 이모지 → Lucide 아이콘 교체**
 - **상태**: ✅ 완료 (Resolved)
 - **설명**: 전체화면 토글 버튼이 화살표 이모지(↗️/↙️)로 되어있어 의미가 불명확함. Lucide Maximize2/Minimize2 아이콘으로 교체.
+
+---
+
+### 🟣 Phase 5: 실사용 버그 수정 & 통화요약 실기능화 (2026-07-29)
+
+#### **Issue #107: [STUB-2] 회의록 요약/자막 API가 완전히 가짜 (하드코딩 mock, in-memory 저장)**
+- **상태**: ✅ 완료 (Resolved)
+- **설명**: `/api/channels/[id]/summary` POST가 실제 AI 호출 없이 템플릿 문자열을 반환하고, GET은 정적 mock 데이터를 반환. `/api/channels/[id]/transcript`는 서버 메모리 객체에만 저장되어 재시작 시 소실되고 PM2 클러스터 워커마다 따로 놈. `TranscriptEntry`/`MeetingSummary` Prisma 모델 신설, 자막을 실제 DB에 영속화, Groq API(`src/lib/groq-summary.ts`)로 실제 한국어 회의록 요약 생성, 음성채널 퇴장 시 자동 트리거하도록 구현. 실제 프로덕션에서 end-to-end 검증 완료.
+
+#### **Issue #108: [UI-2] 지금까지 쌓인 자막을 한 번에 볼 방법이 없고 대화 내용 추출 불가**
+- **상태**: ✅ 완료 (Resolved)
+- **설명**: 통화 중 롤링 자막(최근 3개)만 보이고 전체 히스토리를 볼 UI가 없었음. `ChannelHeaderExtras`에 "실시간 자막 히스토리" 드로어 추가 — 채널의 전체 누적 자막을 4초 폴링으로 실시간 표시하고 `.txt` 다운로드로 대화 내용을 추출할 수 있음.
+
+#### **Issue #109: [MEDIA-1] 가상 배경(모던 사무실/카페/블러) 선택해도 아무 변화 없음, 실패 시 무알림**
+- **상태**: ✅ 완료 (Resolved)
+- **설명**: WebGL을 지원하지 않는 브라우저/기기에서는 MediaPipe 세그멘테이션이 GPU/CPU delegate 무관하게 실패하는데, 실패가 `console.warn`으로만 남고 UI는 계속 선택된 것처럼 보여 "눌러도 반응 없음"으로 체감됨. 실패 시 `cameraBg`를 자동으로 "없음"으로 되돌리고 토스트로 원인을 안내하도록 수정.
+
+#### **Issue #110: [MEDIA-2] 가상 배경 사용 시 의자 등 경계 부분이 프레임마다 깜빡임**
+- **상태**: ✅ 완료 (Resolved)
+- **설명**: 세그멘테이션 마스크를 프레임마다 그대로 합성해 사람 경계 부근(의자 등)이 매 프레임 나타났다 사라짐. 지수이동평균(EMA)으로 마스크를 시간적으로 스무딩(`src/lib/mask-smoothing.ts`)해 완화.
+
+#### **Issue #111: [UX-1] 화면공유/캠 화면을 더블클릭해서 크게 볼 방법이 없음**
+- **상태**: ✅ 완료 (Resolved)
+- **설명**: 캠/화면공유 중인 참가자 타일을 더블클릭하면 그리드 맨 위로 이동해 전체 너비로 크게 표시되는 스포트라이트 기능 추가(`src/lib/spotlight.ts`). 다시 더블클릭하거나 해당 참가자가 나가거나 비디오를 끄면 자동 해제.
+
+#### **Issue #112: [DASHBOARD-1] 첫 로그인 시 가끔 빈 화면만 뜨고 새로고침 2~3번 필요**
+- **상태**: ✅ 완료 (Resolved)
+- **설명**: `fetchSpaces`/`fetchSpaceData`가 실패(네트워크 오류/5xx) 시 재시도 없이 조용히 포기해, 로그인 직후 첫 요청이 일시적으로 실패하면 스페이스/채널 목록이 영구히 빈 상태로 남음. 두 요청에 재시도(최대 3회, 백오프) 추가.
+
+#### **Issue #113: [DEPLOY-2] setup-caddy.sh가 Caddyfile 전체를 덮어써 이 서버의 다른 앱(secertbase, steady2vivid, code-server) 설정을 반복적으로 파괴**
+- **상태**: ✅ 완료 (Resolved)
+- **설명**: 이 서버는 Caddy 하나를 여러 앱이 공유하는데, `setup-caddy.sh`가 `/etc/caddy/Caddyfile` 전체를 덮어써 배포할 때마다 다른 앱의 사이트 블록을 날림(반대의 경우도 마찬가지). 프록시 대상 포트도 3000으로 잘못돼 있었음(`ecosystem.config.js`는 실제로 3001 사용). 각 앱이 `/etc/caddy/sites/*.caddy`에 자기 파일만 소유하고 메인 Caddyfile은 `import`만 하도록 수정, 포트 수정, `restart`→`reload`로 변경(다른 사이트 다운타임 방지). omni/steady2vivid/code-server 도메인 전부 실제 Let's Encrypt 인증서로 복구 확인.
+
+#### **Issue #114: [PROD-1] 프로덕션 서버에 Google OAuth / LiveKit 환경변수가 아예 없어서 로그인·음성채널 500 에러**
+- **상태**: ✅ 완료 (Resolved)
+- **설명**: `GOOGLE_CLIENT_ID/SECRET`, `LIVEKIT_URL/API_KEY/API_SECRET`, `GROQ_API_KEY`가 서버 `.env`에 설정된 적이 없어 각각 `google_auth_not_configured` 리다이렉트와 `/api/livekit/token` 500 에러가 발생. 로컬 `.env.local`의 값을 서버로 전달하고 재빌드(NEXT_PUBLIC_LIVEKIT_URL은 빌드타임에 클라이언트 번들에 박히므로 재시작만으론 불충분) 후 정상 동작 확인.
+
+#### **Issue #115: [DEPLOY-3] GitHub Actions 자동배포가 Tailscale 전용 서버에 접속 불가**
+- **상태**: 🟡 진행 예정 (Open)
+- **설명**: `deploy.yml`이 `dial tcp ***:22: i/o timeout`으로 계속 실패. 서버가 Tailscale(100.64.0.0/10) 전용 IP만 열려있어 GitHub 호스티드 러너가 원천적으로 접속 불가. 현재는 Tailscale로 로컬에서 수동 배포 중. 해결하려면 `deploy.yml`에 Tailscale GitHub Action(oauth client 필요, Tailscale 관리자 콘솔 설정 필요) 추가 필요.
+
+#### **Issue #116: [MOBILE-2] 모든 dialog·페이지 컴포넌트가 모바일/태블릿에서 완전히 대응되지 않음**
+- **상태**: 🟡 진행 예정 (Open)
+- **설명**: SettingsModal, 각종 드로어/다이얼로그, 대시보드 레이아웃 등 전체 컴포넌트의 모바일/태블릿 반응형 점검이 필요. 범위가 커서 우선순위 화면부터 단계적으로 진행 예정.
