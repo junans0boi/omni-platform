@@ -3,6 +3,29 @@ import type { PresenceSnapshot } from "@/lib/events";
 import { MAX_RETAINED_MESSAGES, mergeMessagePage } from "@/lib/message-pagination";
 import type { DisplayRole } from "@/lib/role-appearance";
 
+/**
+ * Retries a GET request a few times before giving up. Without this, a single
+ * transient failure right after login (cold server, session cookie race)
+ * left spaces/channels stuck empty forever — the dashboard showed only the
+ * "select a channel" placeholder until the user manually refreshed.
+ */
+async function fetchJsonWithRetry(url: string, attempts = 3, delayMs = 400): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return res;
+      lastError = new Error(`${url} responded with ${res.status}`);
+    } catch (e) {
+      lastError = e;
+    }
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
 export interface Profile {
   id: string;
   username: string;
@@ -242,11 +265,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   fetchSpaces: async () => {
     set({ isLoading: true });
     try {
-      const res = await fetch("/api/spaces");
-      if (res.ok) {
-        const data = await res.json();
-        set({ spaces: data || [] });
-      }
+      const res = await fetchJsonWithRetry("/api/spaces");
+      const data = await res.json();
+      set({ spaces: data || [] });
     } catch (e) {
       console.error("Error fetching spaces:", e);
     } finally {
@@ -257,15 +278,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   fetchSpaceData: async (spaceId) => {
     set({ isLoading: true });
     try {
-      const res = await fetch(`/api/spaces/${spaceId}`);
-      if (res.ok) {
-        const data = await res.json();
-        set({
-          categories: data.categories || [],
-          channels: data.channels || [],
-          members: data.members || [],
-        });
-      }
+      const res = await fetchJsonWithRetry(`/api/spaces/${spaceId}`);
+      const data = await res.json();
+      set({
+        categories: data.categories || [],
+        channels: data.channels || [],
+        members: data.members || [],
+      });
     } catch (e) {
       console.error("Error fetching space details:", e);
     } finally {
