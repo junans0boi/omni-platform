@@ -26,6 +26,7 @@ import {
 import { useI18n } from "@/i18n/I18nProvider";
 import { VirtualBackgroundProcessor, type VirtualBackgroundMode } from "@/lib/virtual-background";
 import { getScreenCaptureOptions, didPresetChangeWhileSharing } from "@/lib/screen-share-preset";
+import { resolveFocusedTile } from "@/lib/spotlight";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Issue #102 & TICK-201: DataChannel 발언권 및 실시간 자막 메시지 프로토콜
@@ -108,6 +109,8 @@ export default function VoiceGrid() {
   // ── State ──────────────────────────────────────────────────────────────────
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // 더블클릭으로 화면공유/캠 타일 스포트라이트(크게 보기) — "local" 또는 참가자 sid
+  const [focusedTileId, setFocusedTileId] = useState<string | null>(null);
 
   // TICK-301, TICK-302: 실시간 AI 자막 롤링 State (최근 3개 화자 대화 롤링)
   const [showCaptions, setShowCaptions] = useState(true);
@@ -608,6 +611,11 @@ export default function VoiceGrid() {
         : t("voice.status.disconnected");
 
   const hasLocalScreenShare = isConnected && localMedia.hasScreenShare;
+  const effectiveFocusedTileId = resolveFocusedTile({
+    focusedTileId,
+    localHasVideo: isCameraOn || hasLocalScreenShare,
+    remoteParticipantSids: remoteParticipants.map((p) => p.sid),
+  });
   const isEffectivelyMuted = !canPublish || isMuted;
   const visibleConnectionError = connectionError ||
     (!wsUrl ? "LiveKit URL이 설정되지 않았습니다." : null);
@@ -731,13 +739,22 @@ export default function VoiceGrid() {
           {/* Participant Grid */}
           <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-4">
             {/* Local tile */}
-            <div className={`relative aspect-video overflow-hidden rounded-xl border bg-surface ${
-              hasLocalScreenShare ? "col-span-2" : ""
-            } ${
-              activeSpeakerSids.includes(localParticipantSid)
-                ? "border-online shadow-md shadow-online/20"
-                : "border-line"
-            }`}>
+            <div
+              onDoubleClick={() => {
+                if (!isCameraOn && !hasLocalScreenShare) return;
+                setFocusedTileId((cur) => (cur === "local" ? null : "local"));
+              }}
+              className={`relative aspect-video overflow-hidden rounded-xl border bg-surface transition-[grid-column] ${
+                effectiveFocusedTileId === "local"
+                  ? "order-first col-span-2 sm:col-span-3 md:col-span-4 md:aspect-[21/9]"
+                  : hasLocalScreenShare ? "col-span-2" : ""
+              } ${
+                isCameraOn || hasLocalScreenShare ? "cursor-pointer" : ""
+              } ${
+                activeSpeakerSids.includes(localParticipantSid)
+                  ? "border-online shadow-md shadow-online/20"
+                  : "border-line"
+              }`}>
               <div ref={localVideoRef} className="h-full w-full flex items-center justify-center relative overflow-hidden">
                 {/* 실제 비디오는 MediaPipe Person Segmentation으로 합성된 canvas 트랙이 attach됨 (아래 "Attach local video track" effect) */}
                 {isCameraOn && cameraBg !== "none" && (
@@ -788,15 +805,24 @@ export default function VoiceGrid() {
               // 이 참여자가 발언 신청 중인지
               const pHandRaised = floorRequests.some((r) => r.identity === p.identity);
 
+              const isFocused = effectiveFocusedTileId === p.sid;
               return (
                 <div
                   key={p.sid}
                   data-livekit-participant={p.identity}
                   data-livekit-audio-subscribed={hasAudio}
                   data-livekit-video-source={hasScreenShare ? "screen_share" : hasVideo ? "camera" : "none"}
-                  className={`relative aspect-video overflow-hidden rounded-xl border bg-surface ${
-                    hasScreenShare ? "col-span-2" : ""
-                  } ${isSpeaking ? "border-online shadow-md shadow-online/20" : "border-line"}`}
+                  onDoubleClick={() => {
+                    if (!hasVideo) return;
+                    setFocusedTileId((cur) => (cur === p.sid ? null : p.sid));
+                  }}
+                  className={`relative aspect-video overflow-hidden rounded-xl border bg-surface transition-[grid-column] ${
+                    isFocused
+                      ? "order-first col-span-2 sm:col-span-3 md:col-span-4 md:aspect-[21/9]"
+                      : hasScreenShare ? "col-span-2" : ""
+                  } ${hasVideo ? "cursor-pointer" : ""} ${
+                    isSpeaking ? "border-online shadow-md shadow-online/20" : "border-line"
+                  }`}
                 >
                   <div
                     ref={(el) => {
