@@ -479,6 +479,13 @@ export default function VoiceGrid() {
         prev?.stop();
       } catch (e) {
         console.warn("Virtual background init error:", e);
+        if (!cancelled) {
+          setFloorToast({
+            text: "가상 배경을 사용할 수 없습니다 (이 브라우저/기기에서 WebGL을 지원하지 않아요).",
+            ok: false,
+          });
+          setCameraBg("none");
+        }
       }
     };
 
