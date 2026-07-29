@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { VirtualBackgroundProcessor, type VirtualBackgroundMode } from "@/lib/virtual-background";
+import { getScreenCaptureOptions, didPresetChangeWhileSharing } from "@/lib/screen-share-preset";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Issue #102 & TICK-201: DataChannel 발언권 및 실시간 자막 메시지 프로토콜
@@ -488,12 +489,14 @@ export default function VoiceGrid() {
   useEffect(() => {
     const room = roomRef.current;
     if (!room || connectionState !== ConnectionState.Connected || !canPublish) return;
-    const screenCaptureOptions = screenPreset === "1080p60"
-      ? { resolution: { width: 1920, height: 1080, frameRate: 60 }, audio: true }
-      : { resolution: { width: 1280, height: 720, frameRate: 30 }, audio: true };
+    const screenCaptureOptions = getScreenCaptureOptions(screenPreset);
 
-    const presetChangedWhileSharing =
-      isScreenSharing && screenShareInitRef.current && screenPresetRef.current !== screenPreset;
+    const presetChangedWhileSharing = didPresetChangeWhileSharing({
+      isScreenSharing,
+      hasSharedBefore: screenShareInitRef.current,
+      previousPreset: screenPresetRef.current,
+      nextPreset: screenPreset,
+    });
     screenPresetRef.current = screenPreset;
 
     const run = async () => {
