@@ -1,7 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Pin, Image as ImageIcon, Bell, BellOff, X, FileText, Download } from "lucide-react";
+import { Pin, Image as ImageIcon, Bell, BellOff, X, FileText, Download, ScrollText } from "lucide-react";
+
+interface TranscriptEntry {
+  id: string;
+  speakerName: string;
+  text: string;
+  createdAt: string;
+}
 
 interface Message {
   id: string;
@@ -22,12 +29,46 @@ export function ChannelHeaderExtras({
   messages: Message[];
   channelId?: string;
 }) {
-  const [drawer, setDrawer] = useState<"pinned" | "media" | "summary" | null>(null);
+  const [drawer, setDrawer] = useState<"pinned" | "media" | "summary" | "transcript" | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [serverPinnedMessages, setServerPinnedMessages] = useState<Message[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [summaries, setSummaries] = useState<any[]>([]);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[]>([]);
+
+  // 지금까지 쌓인(아직 요약 전) 자막 히스토리 조회
+  const fetchTranscript = useCallback(async () => {
+    if (!channelId) return;
+    try {
+      const res = await fetch(`/api/channels/${channelId}/transcript`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.transcripts) setTranscriptEntries(data.transcripts);
+      }
+    } catch {}
+  }, [channelId]);
+
+  useEffect(() => {
+    if (drawer !== "transcript") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fire-and-forget fetch, setState happens after await
+    fetchTranscript();
+    const timer = setInterval(fetchTranscript, 4000);
+    return () => clearInterval(timer);
+  }, [drawer, fetchTranscript]);
+
+  const handleDownloadTranscript = () => {
+    const lines = transcriptEntries.map(
+      (e) => `[${new Date(e.createdAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}] ${e.speakerName}: ${e.text}`,
+    );
+    const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `transcript-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Fetch summary history from API
   const fetchSummaries = useCallback(async () => {
@@ -184,6 +225,19 @@ export function ChannelHeaderExtras({
         <FileText className="h-4 w-4" />
       </button>
 
+      {/* 실시간 자막 히스토리 & 추출 */}
+      <button
+        onClick={() => setDrawer(drawer === "transcript" ? null : "transcript")}
+        title="자막 히스토리 전체보기 & 추출"
+        className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+          drawer === "transcript"
+            ? "bg-idle/20 text-idle border border-idle/30"
+            : "text-muted hover:bg-surface-2 hover:text-text"
+        }`}
+      >
+        <ScrollText className="h-4 w-4" />
+      </button>
+
       {/* Channel Notification Mute Toggle */}
       <button
         onClick={() => setIsMuted(!isMuted)}
@@ -205,7 +259,14 @@ export function ChannelHeaderExtras({
               {drawer === "pinned" && <Pin className="h-3.5 w-3.5 text-idle" />}
               {drawer === "media" && <ImageIcon className="h-3.5 w-3.5 text-purple-400" />}
               {drawer === "summary" && <FileText className="h-3.5 w-3.5 text-accent" />}
-              {drawer === "pinned" ? "고정된 메시지 (Pin)" : drawer === "media" ? "미디어 & 파일 갤러리" : "AI 회의록 요약"}
+              {drawer === "transcript" && <ScrollText className="h-3.5 w-3.5 text-idle" />}
+              {drawer === "pinned"
+                ? "고정된 메시지 (Pin)"
+                : drawer === "media"
+                  ? "미디어 & 파일 갤러리"
+                  : drawer === "summary"
+                    ? "AI 회의록 요약"
+                    : "실시간 자막 히스토리"}
             </span>
             <button onClick={() => setDrawer(null)} className="text-muted hover:text-text text-xs">
               <X className="h-4 w-4" />
@@ -299,6 +360,38 @@ export function ChannelHeaderExtras({
                   </div>
                 ))
               )}
+            </div>
+          )}
+
+          {drawer === "transcript" && (
+            <div className="space-y-2">
+              <button
+                onClick={handleDownloadTranscript}
+                disabled={transcriptEntries.length === 0}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl bg-idle/15 text-idle text-xs font-bold hover:bg-idle/25 transition disabled:opacity-50"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>대화 내용 추출 (.txt)</span>
+              </button>
+
+              <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                {transcriptEntries.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-muted">
+                    아직 인식된 자막이 없습니다. 통화 중 말씀하시면 여기 쌓입니다.
+                    <p className="text-[10px] mt-1">회의록 요약을 생성하면 이 목록은 비워지고 요약으로 남습니다.</p>
+                  </div>
+                ) : (
+                  transcriptEntries.map((entry) => (
+                    <div key={entry.id} className="rounded-lg bg-surface-2 px-2.5 py-1.5 text-[11px]">
+                      <span className="font-bold text-idle">{entry.speakerName}</span>
+                      <span className="text-muted ml-1.5">
+                        {new Date(entry.createdAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      <p className="text-text mt-0.5 leading-relaxed">{entry.text}</p>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
         </div>

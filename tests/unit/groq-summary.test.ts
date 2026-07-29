@@ -19,7 +19,7 @@ describe("summarizeTranscript", () => {
 
   it("sends the transcript as speaker-prefixed lines and returns Groq's summary", async () => {
     process.env.GROQ_API_KEY = "test-key";
-    let sentBody: any;
+    let sentBody: { messages: { role: string; content: string }[] } | undefined;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (_url: string, init: RequestInit) => {
@@ -37,7 +37,7 @@ describe("summarizeTranscript", () => {
     ]);
 
     expect(result).toBe("## 요약\n테스트 요약");
-    expect(sentBody.messages[1].content).toBe("Alice: 안건 하나 논의합시다\nBob: 동의합니다");
+    expect(sentBody?.messages[1].content).toBe("Alice: 안건 하나 논의합시다\nBob: 동의합니다");
   });
 
   it("throws with the response body when Groq returns a non-2xx status", async () => {
