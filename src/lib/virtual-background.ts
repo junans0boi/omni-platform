@@ -1,6 +1,7 @@
 "use client";
 
 import type { ImageSegmenter, ImageSegmenterResult } from "@mediapipe/tasks-vision";
+import { blendMaskInPlace } from "./mask-smoothing";
 
 export type VirtualBackgroundMode = "blur" | "office" | "cafe";
 
@@ -72,6 +73,10 @@ export class VirtualBackgroundProcessor {
   private bgImage: HTMLImageElement | null = null;
   private rafId: number | null = null;
   private stopped = false;
+  // 마스크를 프레임 단위로 그대로 쓰면 경계 부근(의자 등)이 매 프레임 깜빡인다.
+  // 이전 프레임과 지수이동평균(EMA)으로 섞어서 시간적으로 매끄럽게 만든다.
+  private smoothedMask: Float32Array | null = null;
+  private smoothedMaskDims: { w: number; h: number } | null = null;
 
   readonly outputTrack: MediaStreamTrack;
 
@@ -160,9 +165,17 @@ export class VirtualBackgroundProcessor {
   private composite(result: ImageSegmenterResult) {
     const mask = result.confidenceMasks?.[0];
     if (!mask) return;
-    const maskData = mask.getAsFloat32Array();
+    const rawMask = mask.getAsFloat32Array();
     const mw = mask.width;
     const mh = mask.height;
+
+    if (!this.smoothedMask || this.smoothedMaskDims?.w !== mw || this.smoothedMaskDims?.h !== mh) {
+      this.smoothedMask = Float32Array.from(rawMask);
+      this.smoothedMaskDims = { w: mw, h: mh };
+    } else {
+      blendMaskInPlace(this.smoothedMask, rawMask, 0.35);
+    }
+    const maskData = this.smoothedMask;
 
     // 1) 배경 레이어: 블러 처리된 원본 화면 또는 프리셋 배경 이미지
     if (this.mode === "blur") {
