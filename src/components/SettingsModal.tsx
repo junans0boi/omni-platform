@@ -395,9 +395,9 @@ export function SettingsModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md transition-all animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 backdrop-blur-md transition-all animate-fadeIn sm:p-4">
       {/* Modal Container */}
-      <div className="relative flex h-[90vh] max-h-[700px] w-full max-w-5xl overflow-hidden rounded-3xl border border-line bg-bg-elevated text-text shadow-2xl backdrop-blur-2xl">
+      <div className="relative flex h-[calc(100dvh-1rem)] max-h-[700px] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-line bg-bg-elevated text-text shadow-2xl backdrop-blur-2xl md:h-[90dvh] md:flex-row md:rounded-3xl">
         {/* Fixed Top Right Close Button */}
         <button
           onClick={onClose}
@@ -408,10 +408,10 @@ export function SettingsModal({
         </button>
 
         {/* Left Navigation Sidebar */}
-        <div className="w-64 shrink-0 border-r border-line bg-surface p-5 flex flex-col justify-between select-none">
-          <div>
+        <div className="flex w-full shrink-0 flex-col justify-between border-b border-line bg-surface p-3 select-none md:w-64 md:border-b-0 md:border-r md:p-5">
+          <div className="min-w-0">
             {/* Header Brand */}
-            <div className="flex items-center gap-3 mb-6 px-2">
+            <div className="mb-6 hidden items-center gap-3 px-2 md:flex">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent font-bold text-on-accent shadow-md shadow-[0_4px_12px_-2px_var(--accent)]">
                 ⚙️
               </div>
@@ -422,11 +422,11 @@ export function SettingsModal({
             </div>
 
             {/* Nav Group 1: 계정 */}
-            <div className="mb-4 space-y-1">
-              <span className="px-3 text-[10px] font-extrabold uppercase tracking-wider text-muted">계정</span>
+            <div className="mb-2 flex gap-1 overflow-x-auto md:mb-4 md:block md:space-y-1">
+              <span className="hidden px-3 text-[10px] font-extrabold uppercase tracking-wider text-muted md:inline">계정</span>
               <button
                 onClick={() => setActiveTab("account")}
-                className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold transition ${
+                className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition md:w-full ${
                   activeTab === "account"
                     ? "bg-accent text-on-accent shadow-md shadow-[0_4px_12px_-2px_var(--accent)]"
                     : "text-muted hover:bg-surface-2 hover:text-text"
@@ -437,7 +437,7 @@ export function SettingsModal({
               </button>
               <button
                 onClick={() => setActiveTab("notifications")}
-                className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold transition ${
+                className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition md:w-full ${
                   activeTab === "notifications"
                     ? "bg-accent text-on-accent shadow-md shadow-[0_4px_12px_-2px_var(--accent)]"
                     : "text-muted hover:bg-surface-2 hover:text-text"
@@ -449,11 +449,11 @@ export function SettingsModal({
             </div>
 
             {/* Nav Group 2: 앱 설정 */}
-            <div className="space-y-1">
-              <span className="px-3 text-[10px] font-extrabold uppercase tracking-wider text-muted">앱 설정</span>
+            <div className="flex gap-1 overflow-x-auto md:block md:space-y-1">
+              <span className="hidden px-3 text-[10px] font-extrabold uppercase tracking-wider text-muted md:inline">앱 설정</span>
               <button
                 onClick={() => setActiveTab("voice")}
-                className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold transition ${
+                className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition md:w-full ${
                   activeTab === "voice"
                     ? "bg-accent text-on-accent shadow-md shadow-[0_4px_12px_-2px_var(--accent)]"
                     : "text-muted hover:bg-surface-2 hover:text-text"
@@ -464,7 +464,7 @@ export function SettingsModal({
               </button>
               <button
                 onClick={() => setActiveTab("language")}
-                className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold transition ${
+                className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition md:w-full ${
                   activeTab === "language"
                     ? "bg-accent text-on-accent shadow-md shadow-[0_4px_12px_-2px_var(--accent)]"
                     : "text-muted hover:bg-surface-2 hover:text-text"
@@ -475,7 +475,7 @@ export function SettingsModal({
               </button>
               <button
                 onClick={() => setActiveTab("appearance")}
-                className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold transition ${
+                className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition md:w-full ${
                   activeTab === "appearance"
                     ? "bg-accent text-on-accent shadow-md shadow-[0_4px_12px_-2px_var(--accent)]"
                     : "text-muted hover:bg-surface-2 hover:text-text"
@@ -486,7 +486,7 @@ export function SettingsModal({
               </button>
               <button
                 onClick={() => setActiveTab("developer")}
-                className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold transition ${
+                className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition md:w-full ${
                   activeTab === "developer"
                     ? "bg-accent text-on-accent shadow-md shadow-[0_4px_12px_-2px_var(--accent)]"
                     : "text-muted hover:bg-surface-2 hover:text-text"
@@ -499,7 +499,7 @@ export function SettingsModal({
           </div>
 
           {/* Bottom Logout */}
-          <div className="pt-3 border-t border-line">
+          <div className="hidden border-t border-line pt-3 md:block">
             <button
               onClick={onLogout}
               className="w-full flex items-center justify-center gap-2 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2.5 text-xs font-bold text-danger transition hover:bg-danger/20"
@@ -511,7 +511,7 @@ export function SettingsModal({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 p-6 md:p-8 overflow-y-auto relative no-scrollbar pr-14">
+        <div className="relative min-h-0 min-w-0 flex-1 overflow-y-auto p-4 pt-12 no-scrollbar sm:p-6 sm:pr-14 md:p-8 md:pr-14">
           {/* TAB 1: Account (계정 정보 & 보안 & 연결) */}
           {activeTab === "account" && (
             <div className="space-y-6">
@@ -521,19 +521,19 @@ export function SettingsModal({
               </div>
 
               {/* Section 1: 계정 정보 */}
-              <div className="rounded-2xl border border-line bg-surface p-5 space-y-4">
+              <div className="space-y-4 rounded-2xl border border-line bg-surface p-4 sm:p-5">
                 <h4 className="text-xs font-extrabold uppercase tracking-wider text-muted">계정 정보</h4>
 
                 {/* 사용자명 */}
-                <div className="flex items-center justify-between py-2 border-b border-line">
-                  <div>
+                <div className="flex flex-col items-stretch gap-2 border-b border-line py-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
                     <span className="text-xs text-muted block">사용자명</span>
                     {isEditingUsername ? (
                       <input
                         type="text"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        className="mt-1 rounded-lg border border-accent bg-surface-2 px-3 py-1 text-xs font-bold text-text outline-none"
+                        className="mt-1 w-full rounded-lg border border-accent bg-surface-2 px-3 py-1 text-xs font-bold text-text outline-none"
                       />
                     ) : (
                       <span className="text-sm font-bold text-text">{username}</span>
@@ -549,15 +549,15 @@ export function SettingsModal({
                 </div>
 
                 {/* 이메일 */}
-                <div className="flex items-center justify-between py-2 border-b border-line">
-                  <div>
+                <div className="flex flex-col items-stretch gap-2 border-b border-line py-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
                     <span className="text-xs text-muted block">이메일</span>
                     {isEditingEmail ? (
                       <input
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="mt-1 rounded-lg border border-accent bg-surface-2 px-3 py-1 text-xs font-bold text-text outline-none"
+                        className="mt-1 w-full rounded-lg border border-accent bg-surface-2 px-3 py-1 text-xs font-bold text-text outline-none"
                       />
                     ) : (
                       <span className="text-sm font-bold text-text tracking-wide">
@@ -565,7 +565,7 @@ export function SettingsModal({
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <button
                       onClick={() => setShowEmail(!showEmail)}
                       className="flex items-center gap-1 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-muted hover:bg-surface-2 hover:text-text transition"
@@ -584,15 +584,15 @@ export function SettingsModal({
                 </div>
 
                 {/* 전화번호 */}
-                <div className="flex items-center justify-between py-2">
-                  <div>
+                <div className="flex flex-col items-stretch gap-2 py-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
                     <span className="text-xs text-muted block">전화번호</span>
                     {isEditingPhone ? (
                       <input
                         type="text"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        className="mt-1 rounded-lg border border-accent bg-surface-2 px-3 py-1 text-xs font-bold text-text outline-none"
+                        className="mt-1 w-full rounded-lg border border-accent bg-surface-2 px-3 py-1 text-xs font-bold text-text outline-none"
                       />
                     ) : (
                       <span className="text-sm font-bold text-text tracking-wide">
@@ -600,7 +600,7 @@ export function SettingsModal({
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <button
                       onClick={() => setShowPhone(!showPhone)}
                       className="flex items-center gap-1 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-muted hover:bg-surface-2 hover:text-text transition"
@@ -620,10 +620,10 @@ export function SettingsModal({
               </div>
 
               {/* Section 2: 비밀번호 및 보안 */}
-              <div className="rounded-2xl border border-line bg-surface p-5 space-y-4">
+              <div className="space-y-4 rounded-2xl border border-line bg-surface p-4 sm:p-5">
                 <h4 className="text-xs font-extrabold uppercase tracking-wider text-muted">비밀번호 및 보안</h4>
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
                     <span className="text-sm font-bold text-text block">비밀번호</span>
                     <span className="text-xs text-muted">계정 보안을 위해 정기적으로 비밀번호를 변경하세요.</span>
                   </div>
@@ -681,10 +681,10 @@ export function SettingsModal({
               </div>
 
               {/* Section 3: 연결 */}
-              <div className="rounded-2xl border border-line bg-surface p-5 space-y-3">
+              <div className="space-y-3 rounded-2xl border border-line bg-surface p-4 sm:p-5">
                 <h4 className="text-xs font-extrabold uppercase tracking-wider text-muted">연결</h4>
-                <div className="flex items-center justify-between p-3.5 rounded-xl border border-line bg-surface-2">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-col items-stretch gap-3 rounded-xl border border-line bg-surface-2 p-3.5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface border border-line shadow-xs">
                       <svg className="h-5 w-5" viewBox="0 0 24 24">
                         <path
@@ -705,9 +705,9 @@ export function SettingsModal({
                         />
                       </svg>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <span className="text-xs font-bold text-text block">Google 계정 연동</span>
-                      <span className="text-[11px] text-muted">
+                      <span className="block truncate text-[11px] text-muted">
                         {profile?.email ? `연동됨 (${profile.email})` : "Google OAuth 2.0 원클릭 로그인 지원"}
                       </span>
                     </div>
@@ -738,7 +738,7 @@ export function SettingsModal({
               </div>
 
               {/* 일반 알림 */}
-              <div className="rounded-2xl border border-line bg-surface p-5 space-y-4">
+              <div className="space-y-4 rounded-2xl border border-line bg-surface p-4 sm:p-5">
                 <h4 className="text-xs font-extrabold uppercase tracking-wider text-muted">일반 알림</h4>
 
                 {/* PC 알림 활성화 */}
@@ -974,8 +974,8 @@ export function SettingsModal({
 
                 {/* 마이크 테스트 & 레벨 메터 */}
                 <div className="p-4 rounded-xl border border-line bg-surface-2 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                       <span className="text-xs font-bold text-text block">마이크 테스트</span>
                       <span className="text-[11px] text-muted">마이크에 말을 하여 입력 음량을 확인하고 스피커/헤드폰으로 내 목소리를 직접 들어보세요.</span>
                     </div>
@@ -1000,7 +1000,7 @@ export function SettingsModal({
                   </div>
 
                   {/* Audio Loopback Toggle */}
-                  <div className="flex items-center justify-between pt-1 border-t border-line">
+                  <div className="flex items-center justify-between gap-3 border-t border-line pt-1">
                     <div className="flex items-center gap-2">
                       <Volume2 className="h-3.5 w-3.5 text-accent" />
                       <span className="text-xs font-semibold text-muted">내 목소리 직접 듣기 (오디오 루프백)</span>
@@ -1017,7 +1017,7 @@ export function SettingsModal({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-muted pt-1">
+                <div className="flex flex-col items-start justify-between gap-1 pt-1 text-[11px] text-muted sm:flex-row sm:items-center">
                   <span>도움이 필요하신가요? 문제 해결 가이드를 확인하세요.</span>
                   <a href="#help" className="text-accent hover:underline flex items-center gap-1">
                     <HelpCircle className="h-3 w-3" />

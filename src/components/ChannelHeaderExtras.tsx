@@ -253,7 +253,7 @@ export function ChannelHeaderExtras({
 
       {/* Drawer Overlay */}
       {drawer && (
-        <div className="absolute top-10 right-0 w-80 rounded-2xl border border-line bg-surface p-4 shadow-2xl backdrop-blur-2xl z-50 text-left animate-fadeIn">
+        <div data-testid="channel-header-drawer" className="absolute right-0 top-10 z-50 max-h-[calc(100dvh-4rem)] w-[calc(100vw-1.5rem)] max-w-80 overflow-y-auto rounded-2xl border border-line bg-surface p-4 text-left shadow-2xl backdrop-blur-2xl animate-fadeIn">
           <div className="flex items-center justify-between border-b border-line pb-2.5 mb-3">
             <span className="text-xs font-bold text-text flex items-center gap-1.5">
               {drawer === "pinned" && <Pin className="h-3.5 w-3.5 text-idle" />}

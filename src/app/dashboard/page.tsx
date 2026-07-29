@@ -41,6 +41,11 @@ type ModalType =
   | null;
 
 const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
+const MOBILE_VIEWPORT_QUERY = "(max-width: 767px)";
+
+function isMobileViewport() {
+  return window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -162,6 +167,12 @@ export default function DashboardPage() {
     [profile],
   );
 
+  const closeSidebarOnMobile = () => {
+    if (isMobileViewport()) {
+      setIsChannelSidebarOpen(false);
+    }
+  };
+
   useEffect(() => {
     getSoundEffects()?.setPreference(storedSoundPreference);
   }, [storedSoundPreference]);
@@ -201,7 +212,7 @@ export default function DashboardPage() {
   }, [setTheme, setThemeName]);
 
   useEffect(() => {
-    const mobile = window.matchMedia("(max-width: 767px)");
+    const mobile = window.matchMedia(MOBILE_VIEWPORT_QUERY);
     const frame = window.requestAnimationFrame(() => {
       if (mobile.matches) {
         setIsChannelSidebarOpen(false);
@@ -280,7 +291,7 @@ export default function DashboardPage() {
   // Issue #101: Escape 키로 모바일 사이드바 닫기
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isChannelSidebarOpen && window.innerWidth < 768) {
+      if (e.key === "Escape" && isChannelSidebarOpen && isMobileViewport()) {
         setIsChannelSidebarOpen(false);
       }
     };
@@ -807,7 +818,7 @@ export default function DashboardPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   if (!mounted) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-bg text-text">
+      <div className="flex h-dvh w-full items-center justify-center bg-bg text-text">
         <div className="flex items-center gap-3">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
           <span className="text-xs font-semibold text-muted">Loading Omni Platform...</span>
@@ -817,7 +828,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-bg text-text">
+    <div className="flex h-dvh w-full overflow-hidden bg-bg text-text">
       {/* Mobile/Tablet backdrop overlay — Issue #101 */}
       {isChannelSidebarOpen && (
         <div
@@ -1011,7 +1022,11 @@ export default function DashboardPage() {
                                   className="w-full rounded px-2 py-1 text-sm outline-hidden bg-surface-2 text-text border border-accent ml-2" />
                               ) : (
                                 <>
-                                  <button onClick={() => { setActiveChannelId(ch.id); if (ch.type !== "TEXT") joinVoiceChannel(ch.id); }}
+                                  <button onClick={() => {
+                                    setActiveChannelId(ch.id);
+                                    if (ch.type !== "TEXT") joinVoiceChannel(ch.id);
+                                    closeSidebarOnMobile();
+                                  }}
                                     onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "channel", id: ch.id, x: e.clientX, y: e.clientY, name: ch.name }); }}
                                     className={`flex flex-1 items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs transition ${isActive ? 'bg-accent-soft text-text border border-accent font-semibold' : 'text-muted hover:bg-surface-2 hover:text-text'}`}>
                                     {ch.type === "TEXT" ? <Hash className="h-3.5 w-3.5 shrink-0 opacity-70" /> : <Volume2 className="h-3.5 w-3.5 shrink-0 opacity-70 text-accent" />}
@@ -1100,7 +1115,7 @@ export default function DashboardPage() {
                                   setActiveChannelId(ch.id);
                                   if (ch.type !== "TEXT") joinVoiceChannel(ch.id);
                                   // 모바일에서 채널 선택 시 자동으로 사이드바 닫기 — Issue #101
-                                  if (window.innerWidth < 768) setIsChannelSidebarOpen(false);
+                                  closeSidebarOnMobile();
                                 }}
                                   onContextMenu={(e) => { e.preventDefault(); if (isAdminOrOwner) setContextMenu({ type: "channel", id: ch.id, x: e.clientX, y: e.clientY, name: ch.name }); }}
                                   className={`flex flex-1 items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs transition ${isActive ? 'bg-accent-soft text-text border border-accent font-semibold' : 'text-muted hover:bg-surface-2 hover:text-text'}`}>
@@ -1340,7 +1355,17 @@ export default function DashboardPage() {
       </div>
 
       {/* 2. Main Chat Area or Friends Panel */}
-      <div className="flex min-w-0 flex-1 flex-col bg-surface">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-surface">
+        {(mainView === "friends" || !activeChannel || (activeChannel.type as string) === "DOCS" || (activeChannel.type as string) === "CANVAS") && !isChannelSidebarOpen && (
+          <button
+            type="button"
+            onClick={() => setIsChannelSidebarOpen(true)}
+            aria-label="Open navigation sidebar"
+            className="absolute left-0 top-1/2 z-20 flex h-12 w-7 -translate-y-1/2 items-center justify-center rounded-r-xl border border-l-0 border-line bg-surface-2 text-muted shadow-lg"
+          >
+            <PanelLeft className="h-5 w-5" />
+          </button>
+        )}
         {mainView === "friends" ? (
           <FriendsPanel
             currentProfile={profile}
@@ -1369,19 +1394,19 @@ pendingFile={friendsAndDms.pendingFile}
         ) : activeChannel ? (
           <>
             {/* Top Bar */}
-            <div className="flex h-14 shrink-0 items-center justify-between border-b border-line px-4">
-              <div className="flex items-center gap-3">
+            <div className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-1 border-b border-line px-2 py-2 sm:h-14 sm:flex-nowrap sm:px-4 sm:py-0">
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                 <button onClick={() => setIsChannelSidebarOpen(!isChannelSidebarOpen)} aria-label="Toggle channel sidebar" className="rounded p-1.5 hover:bg-surface-2 text-muted">
                   {isChannelSidebarOpen ? <PanelLeftClose className="h-5 w-5" /> : <PanelLeft className="h-5 w-5" />}
                 </button>
                 <div className="h-4 w-px bg-line" />
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   {activeChannel.type === "TEXT" ? <Hash className="h-5 w-5 text-muted" /> : <Volume2 className="h-5 w-5 text-muted" />}
-                  <h1 className="text-base font-bold">{activeChannel.name}</h1>
+                  <h1 className="truncate text-base font-bold">{activeChannel.name}</h1>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex w-full shrink-0 items-center justify-end gap-1 sm:w-auto sm:gap-2">
                 <NotificationDrawer
                   onSelectChannel={(sId, cId) => {
                     if (sId) setActiveSpaceId(sId);
@@ -1768,8 +1793,8 @@ pendingFile={friendsAndDms.pendingFile}
 
       {/* ── Modals ──────────────────────────────────────────────────────── */}
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl p-6 shadow-2xl bg-surface border border-line">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-2 backdrop-blur-sm sm:p-4">
+          <div className="max-h-[calc(100dvh-1rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:p-6">
             {modal === "createSpace" && (
               <form onSubmit={handleCreateSpace} className="flex flex-col gap-4">
                 <h2 className="text-xl font-bold">{t("dialog.createSpace")}</h2>

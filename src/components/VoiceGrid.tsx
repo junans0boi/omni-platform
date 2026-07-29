@@ -45,6 +45,7 @@ interface FloorMessage {
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
+const MOBILE_POPOVER_CLASS = "fixed inset-x-3 bottom-3 z-50 max-h-[calc(100dvh-1.5rem)] w-auto overflow-y-auto rounded-2xl border border-line bg-surface text-left shadow-2xl backdrop-blur-2xl";
 
 function encodeFloor(msg: FloorMessage): Uint8Array<ArrayBuffer> {
   return enc.encode(JSON.stringify(msg)) as Uint8Array<ArrayBuffer>;
@@ -676,7 +677,7 @@ export default function VoiceGrid() {
 
   return (
     <div
-      className="border-b border-line bg-black/40 backdrop-blur-md"
+      className="shrink-0 border-b border-line bg-black/40 backdrop-blur-md"
       data-livekit-video-rendering={renderVideo ? "active" : "paused"}
     >
       {/* ── Floor Toast Notification ─────────────────────────────────────── */}
@@ -698,17 +699,17 @@ export default function VoiceGrid() {
       )}
 
       {/* Header */}
-      <div className="flex h-9 items-center justify-between px-4">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+      <div className="flex h-9 items-center justify-between gap-2 px-3 sm:px-4">
+        <span className="flex min-w-0 items-center gap-1.5 truncate text-xs font-semibold text-muted">
           <span className={`h-2 w-2 rounded-full ${isConnected ? "animate-pulse bg-online" : "bg-idle"}`} />
           {connectionLabel}
           {visibleConnectionError && (
-            <span className="ml-2 text-danger">— {visibleConnectionError}</span>
+            <span className="ml-2 truncate text-danger">— {visibleConnectionError}</span>
           )}
         </span>
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-surface hover:text-text"
+          className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-surface hover:text-text"
         >
           {isCollapsed
             ? <><span>{t("voice.control.show")}</span><ChevronDown className="h-3 w-3" /></>
@@ -744,7 +745,7 @@ export default function VoiceGrid() {
           )}
 
           {/* Participant Grid */}
-          <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-4">
+          <div className="grid max-h-[42dvh] grid-cols-2 gap-2 overflow-y-auto p-2 sm:p-3 lg:grid-cols-3 xl:grid-cols-4">
             {/* Local tile */}
             <div
               onDoubleClick={() => {
@@ -753,7 +754,7 @@ export default function VoiceGrid() {
               }}
               className={`relative aspect-video overflow-hidden rounded-xl border bg-surface transition-[grid-column] ${
                 effectiveFocusedTileId === "local"
-                  ? "order-first col-span-2 sm:col-span-3 md:col-span-4 md:aspect-[21/9]"
+                  ? "order-first col-span-2 lg:col-span-3 xl:col-span-4 xl:aspect-[21/9]"
                   : hasLocalScreenShare ? "col-span-2" : ""
               } ${
                 isCameraOn || hasLocalScreenShare ? "cursor-pointer" : ""
@@ -825,7 +826,7 @@ export default function VoiceGrid() {
                   }}
                   className={`relative aspect-video overflow-hidden rounded-xl border bg-surface transition-[grid-column] ${
                     isFocused
-                      ? "order-first col-span-2 sm:col-span-3 md:col-span-4 md:aspect-[21/9]"
+                      ? "order-first col-span-2 lg:col-span-3 xl:col-span-4 xl:aspect-[21/9]"
                       : hasScreenShare ? "col-span-2" : ""
                   } ${hasVideo ? "cursor-pointer" : ""} ${
                     isSpeaking ? "border-online shadow-md shadow-online/20" : "border-line"
@@ -859,11 +860,11 @@ export default function VoiceGrid() {
                     </div>
                   )}
 
-                  <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-text backdrop-blur-xs">
+                  <div className="absolute bottom-1.5 left-1.5 flex max-w-[calc(100%-5rem)] min-w-0 items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-text backdrop-blur-xs">
                     {isMutedRemote && <MicOff className="h-2.5 w-2.5 text-danger" />}
-                    {p.name || p.identity}
+                    <span className="truncate">{p.name || p.identity}</span>
                   </div>
-                  <label className="absolute right-1.5 bottom-1.5 flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-text">
+                  <label className="absolute right-1.5 bottom-1.5 hidden items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-text xl:flex">
                     <span className="sr-only">{p.name || p.identity} volume</span>
                     <Volume2 className="h-2.5 w-2.5" aria-hidden="true" />
                     <input
@@ -883,16 +884,16 @@ export default function VoiceGrid() {
           {showCaptions && captionsList.length > 0 && (
             <div className="mx-3 mb-2 flex flex-col items-center justify-center space-y-1.5 animate-in slide-in-from-bottom-2 duration-200">
               {captionsList.map((cap) => (
-                <div key={cap.id} className="flex items-center gap-2 rounded-xl border border-accent/30 bg-surface/90 px-4 py-1.5 shadow-lg backdrop-blur-md text-xs max-w-xl">
-                  <span className="font-bold text-accent shrink-0">💬 @{cap.speaker}:</span>
-                  <span className="text-text font-medium truncate">{cap.text}</span>
+                <div key={cap.id} className="flex w-full max-w-xl min-w-0 items-center gap-2 rounded-xl border border-accent/30 bg-surface/90 px-3 py-1.5 text-xs shadow-lg backdrop-blur-md sm:px-4">
+                  <span className="max-w-[40%] shrink-0 truncate font-bold text-accent">💬 @{cap.speaker}:</span>
+                  <span className="min-w-0 truncate font-medium text-text">{cap.text}</span>
                 </div>
               ))}
             </div>
           )}
 
           {/* Controls */}
-          <div className="flex items-center justify-center gap-3 py-2.5 border-t border-line flex-wrap px-3">
+          <div className="flex flex-wrap items-center justify-center gap-1.5 border-t border-line px-2 py-2.5 sm:gap-3 sm:px-3">
             {/* Mic */}
             <ControlButton
               active={!isEffectivelyMuted}
@@ -935,7 +936,7 @@ export default function VoiceGrid() {
 
               {/* 카메라 가상 배경 선택 팝오버 (Discord Virtual Backgrounds) */}
               {showCameraMenu && (
-                <div className="absolute bottom-12 left-0 w-64 rounded-2xl border border-line bg-surface p-3 shadow-2xl backdrop-blur-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-150">
+                <div data-testid="camera-settings-popover" className={`${MOBILE_POPOVER_CLASS} p-3 animate-in fade-in zoom-in-95 duration-150 sm:absolute sm:inset-x-auto sm:bottom-12 sm:left-0 sm:w-64`}>
                   <div className="flex items-center justify-between border-b border-line pb-2 mb-2">
                     <span className="text-xs font-bold text-text flex items-center gap-1.5">
                       <Video className="h-3.5 w-3.5 text-accent" />
@@ -1010,7 +1011,7 @@ export default function VoiceGrid() {
 
               {/* 화면 공유 화질 선택 팝오버 */}
               {showScreenMenu && (
-                <div className="absolute bottom-12 left-0 w-60 rounded-2xl border border-line bg-surface p-3 shadow-2xl backdrop-blur-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-150">
+                <div data-testid="screen-settings-popover" className={`${MOBILE_POPOVER_CLASS} p-3 animate-in fade-in zoom-in-95 duration-150 sm:absolute sm:inset-x-auto sm:bottom-12 sm:left-0 sm:w-60`}>
                   <div className="flex items-center justify-between border-b border-line pb-2 mb-2">
                     <span className="text-xs font-bold text-text flex items-center gap-1.5">
                       <Monitor className="h-3.5 w-3.5 text-online" />
@@ -1058,7 +1059,7 @@ export default function VoiceGrid() {
             {activeChannel && (
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface border border-line text-[10px] font-bold text-accent">
                 <span>{modeIcon}</span>
-                <span>{modeLabel}</span>
+                <span className="hidden sm:inline">{modeLabel}</span>
                 {isHost && <span className="text-amber-400">👑</span>}
               </div>
             )}
@@ -1066,7 +1067,7 @@ export default function VoiceGrid() {
             {/* ── MEETING / LECTURE 전용 (GENERAL에서 완전 숨김) ── */}
             {isStructuredMode && (
               <>
-                <div className="h-5 w-px bg-surface-2" />
+                <div className="hidden h-5 w-px bg-surface-2 sm:block" />
 
                 {/* Raise Hand — 비-호스트 전용 */}
                 {!isHost && (
@@ -1102,7 +1103,7 @@ export default function VoiceGrid() {
                       className="flex h-9 items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-500/10 px-3 text-xs font-semibold text-purple-300 hover:bg-purple-500/20 transition"
                     >
                       <Users className="h-3.5 w-3.5" />
-                      <span>{t("voice.control.speakerRequests")}</span>
+                      <span className="hidden sm:inline">{t("voice.control.speakerRequests")}</span>
                       {floorRequests.length > 0 && (
                         <span className="flex h-4 w-4 items-center justify-center rounded-full bg-idle text-[10px] font-bold text-slate-950 animate-bounce">
                           {floorRequests.length}
@@ -1112,7 +1113,7 @@ export default function VoiceGrid() {
 
                     {/* Floor Panel Dropdown */}
                     {showFloorPanel && (
-                      <div className="absolute bottom-12 right-0 w-80 rounded-2xl border border-line bg-surface p-4 shadow-2xl backdrop-blur-2xl z-50 text-left">
+                      <div data-testid="floor-requests-popover" className={`${MOBILE_POPOVER_CLASS} p-4 sm:absolute sm:inset-x-auto sm:bottom-12 sm:right-0 sm:w-80`}>
                         <div className="flex items-center justify-between border-b border-line pb-2 mb-3">
                           <span className="text-xs font-bold text-text flex items-center gap-1.5">
                             <Users className="h-3.5 w-3.5 text-purple-300" />
@@ -1206,7 +1207,7 @@ export default function VoiceGrid() {
               {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </button>
 
-            <div className="h-5 w-px bg-surface-2" />
+            <div className="hidden h-5 w-px bg-surface-2 sm:block" />
 
             {/* Leave */}
             <button
@@ -1214,7 +1215,7 @@ export default function VoiceGrid() {
               className="flex h-9 items-center gap-1.5 rounded-full bg-danger px-4 text-xs font-bold text-on-accent shadow-lg shadow-[0_4px_12px_-2px_var(--danger)] hover:bg-danger/90 active:scale-95"
             >
               <PhoneOff className="h-3.5 w-3.5" />
-              {t("voice.control.leave")}
+              <span className="hidden sm:inline">{t("voice.control.leave")}</span>
             </button>
           </div>
         </div>
@@ -1243,7 +1244,7 @@ function ControlButton({
       title={title}
       aria-pressed={ariaPressed}
       disabled={disabled}
-      className={`flex h-9 w-9 items-center justify-center rounded-full border transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 ${active ? activeClass : inactiveClass}`}
+      className={`flex h-10 w-10 items-center justify-center rounded-full border transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 sm:h-9 sm:w-9 ${active ? activeClass : inactiveClass}`}
     >
       {children}
     </button>
