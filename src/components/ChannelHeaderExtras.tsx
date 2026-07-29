@@ -42,6 +42,7 @@ export function ChannelHeaderExtras({
 
   useEffect(() => {
     if (drawer === "summary") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- fire-and-forget fetch, setState happens after await
       fetchSummaries();
     }
   }, [drawer, fetchSummaries]);
@@ -106,6 +107,7 @@ export function ChannelHeaderExtras({
 
   useEffect(() => {
     if (drawer === "pinned") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- fire-and-forget fetch, setState happens after await
       fetchPinnedMessages();
     }
   }, [drawer, fetchPinnedMessages]);

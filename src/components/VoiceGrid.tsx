@@ -133,6 +133,7 @@ export default function VoiceGrid() {
     ConnectionState.Disconnected
   );
   const [localParticipantSid, setLocalParticipantSid] = useState("");
+  const [localParticipantIdentity, setLocalParticipantIdentity] = useState("");
   const [localMedia, setLocalMedia] = useState({ revision: 0, hasScreenShare: false });
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [participantVolumeOverride, setParticipantVolumeOverride] = useState<{
@@ -295,6 +296,7 @@ export default function VoiceGrid() {
     room.on(RoomEvent.Disconnected, () => {
       setRemoteParticipants([]);
       setLocalParticipantSid("");
+      setLocalParticipantIdentity("");
       setFloorRequests([]);
       setGrantedSpeakers([]);
     });
@@ -372,6 +374,7 @@ export default function VoiceGrid() {
         await room.connect(wsUrl, livekitToken);
         if (disposed) { await room.disconnect(); return; }
         setLocalParticipantSid(room.localParticipant.sid);
+        setLocalParticipantIdentity(room.localParticipant.identity);
         setAudioBlocked(!room.canPlaybackAudio);
         syncParticipants();
         getSoundEffects()?.emit("LOCAL_CONNECTED");
@@ -651,8 +654,7 @@ export default function VoiceGrid() {
     publishFloor({ type: "FLOOR_REVOKE", identity });
   };
 
-  const myIdentity = roomRef.current?.localParticipant.identity ?? "";
-  const iAmGranted = grantedSpeakers.includes(myIdentity);
+  const iAmGranted = grantedSpeakers.includes(localParticipantIdentity);
 
   return (
     <div
